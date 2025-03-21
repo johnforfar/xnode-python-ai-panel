@@ -2,7 +2,7 @@
 name = 'xnode-python-ai-panel'
 version = '1.0.0'
 description = 'Python app running on Xnode.'
-dependencies = []
+dependencies = ["uagents", "aiohttp"]
 
 [project.scripts]
 xnode-python-ai-panel = "main:main"
