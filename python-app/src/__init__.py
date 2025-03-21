@@ -1,0 +1,1 @@
+from . import main as xnode-python-ai-panel
