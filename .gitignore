@@ -1,0 +1,10 @@
+venv*
+audio_output*
+*.wav
+*.mp3
+*.m4a
+*.ogg
+*.flac
+*.aac
+EXAMPLE*
+*pycache*

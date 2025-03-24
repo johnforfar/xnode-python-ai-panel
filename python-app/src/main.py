@@ -40,7 +40,8 @@ AGENTS = [
 
 conversation_active = False
 try:
-    tts = SesameTTS(device="cpu", model_dir="/Users/johnny/Code/OpenxAI/models")
+    # Use the internal models directory
+    tts = SesameTTS(device="cpu", model_dir="/models")
     tts_available = True
     print("INFO:     TTS system initialized successfully")
 except Exception as e:
