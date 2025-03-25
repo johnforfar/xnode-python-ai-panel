@@ -25,5 +25,13 @@ in
         DynamicUser = true;
       };
     };
+
+    services.ollama = {
+      enable = true;
+      loadModels = [
+        "deepseek-r1:1.5b"
+        "qwen2.5-coder:0.5b"
+      ]; # Add any ollama models required
+    };
   };
 }
