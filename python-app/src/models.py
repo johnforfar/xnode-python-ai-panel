@@ -5,9 +5,9 @@ import torch.nn as nn
 import os
 from pathlib import Path
 
-# Add this after the imports
+# Define PROJECT_ROOT at the module level
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-print(f"INFO: Models PROJECT_ROOT set to: {PROJECT_ROOT}")
+print(f"INFO: [models.py] PROJECT_ROOT set to: {PROJECT_ROOT}")
 
 # Custom Embedding class to skip random initialization
 class UninitializedEmbedding(nn.Module):

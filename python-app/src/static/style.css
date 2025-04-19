@@ -32,3 +32,56 @@ body {
 .conversation-panel strong {
     color: #007bff;
 }
+
+.message-container {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.message-text {
+    margin: 0 0 5px 0; /* Spacing between text and controls */
+}
+
+.time-info {
+    font-size: 0.8em;
+    color: #777;
+    margin-left: 5px;
+}
+
+.audio-controls {
+    font-size: 0.9em;
+    color: #555;
+}
+
+.audio-status {
+    display: inline-block;
+    min-width: 120px; /* Give space for status text */
+    margin-right: 10px;
+}
+
+.audio-time {
+     font-size: 0.9em;
+     color: #777;
+     margin-left: 5px;
+}
+
+.play-button {
+    background: none;
+    border: none;
+    color: #007bff;
+    cursor: pointer;
+    padding: 0 5px;
+    font-size: 1.1em;
+    vertical-align: middle; /* Align icon better */
+}
+
+.play-button:hover {
+    color: #0056b3;
+}
+
+/* Style the checkbox */
+.controls label input[type="checkbox"] {
+    margin-right: 5px;
+    vertical-align: middle;
+}
