@@ -1,10 +1,26 @@
-venv*
-audio_output*
+# Virtual environments
+venv*/
+
+# Audio files
+audio_output*/
 *.wav
 *.mp3
 *.m4a
 *.ogg
 *.flac
 *.aac
-EXAMPLE*
-*pycache*
+
+# Examples and cache
+EXAMPLE*/
+*pycache*/
+
+# Model and script directories
+/models/
+/scripts/
+
+# Logs
+*.log
+*.txt
+
+# Keys
+python-app/private_keys.json

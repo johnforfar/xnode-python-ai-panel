@@ -9,12 +9,50 @@ from datetime import datetime
 from generator import load_csm_1b, Segment, load_csm_1b_local
 
 class SesameTTS:
-    def __init__(self, device="cpu", model_dir="/models"):
+    def __init__(self, device=None, model_dir=None):
         """Initialize the Sesame CSM-1B TTS system"""
         print(f"INFO:     Initializing SesameTTS with device={device}, model_dir={model_dir}")
         
         # Disable Triton compilation which can cause issues
         os.environ["NO_TORCH_COMPILE"] = "1"
+        
+        # Auto-detect device if not specified
+        if device is None:
+            if torch.cuda.is_available():
+                device = "cuda"
+                print(f"INFO:     Auto-selected CUDA device: {torch.cuda.get_device_name(0)}")
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                # M1 Mac - Force CPU for better compatibility
+                device = "cpu"
+                os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+                print(f"INFO:     Detected M1 Mac, using CPU")
+            else:
+                device = "cpu"
+                print(f"INFO:     Auto-selected CPU device")
+        
+        # Get project root for relative paths
+        PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        
+        # Determine model directory
+        if model_dir is None:
+            # Try multiple possible locations
+            potential_model_dirs = [
+                os.path.join(PROJECT_ROOT, "models"),
+                "/models",  # Absolute path for Docker containers
+                "models",   # Relative to current working directory
+                "../models" # One level up
+            ]
+            
+            for dir_path in potential_model_dirs:
+                if os.path.exists(dir_path):
+                    model_dir = dir_path
+                    print(f"INFO:     Found models at: {model_dir}")
+                    break
+            
+            if model_dir is None:
+                # Default to project models directory even if it doesn't exist yet
+                model_dir = os.path.join(PROJECT_ROOT, "models")
+                print(f"INFO:     Using default model directory: {model_dir}")
         
         try:
             # Set environment variables for HuggingFace to find models locally

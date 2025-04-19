@@ -1,0 +1,34 @@
+body {
+    font-family: sans-serif;
+    margin: 20px;
+}
+
+.status-bar {
+    padding: 10px;
+    background-color: #eee;
+    margin-bottom: 10px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.controls {
+    margin-bottom: 10px;
+}
+
+.conversation-panel {
+    border: 1px solid #ccc;
+    padding: 10px;
+    height: 400px;
+    overflow-y: scroll;
+    background-color: #f9f9f9;
+}
+
+.conversation-panel p {
+    margin: 5px 0;
+    padding: 5px;
+    border-bottom: 1px dotted #eee;
+}
+
+.conversation-panel strong {
+    color: #007bff;
+}

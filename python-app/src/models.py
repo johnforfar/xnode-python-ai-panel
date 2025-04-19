@@ -2,8 +2,12 @@
 from dataclasses import dataclass
 import torch
 import torch.nn as nn
-from huggingface_hub import PyTorchModelHubMixin
-from torchtune.models import llama3_2
+import os
+from pathlib import Path
+
+# Add this after the imports
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+print(f"INFO: Models PROJECT_ROOT set to: {PROJECT_ROOT}")
 
 # Custom Embedding class to skip random initialization
 class UninitializedEmbedding(nn.Module):
@@ -16,47 +20,45 @@ class UninitializedEmbedding(nn.Module):
     def forward(self, input):
         return nn.functional.embedding(input, self.weight)
 
-# Define transformer flavors using torchtune's llama3_2
-def llama3_2_1b():
-    return llama3_2.llama3_2(
-        vocab_size=128256,
-        num_layers=16,
-        num_heads=32,
-        num_kv_heads=8,
-        embed_dim=2048,
-        max_seq_len=2048,
-        intermediate_dim=8192,
-        attn_dropout=0.0,
-        norm_eps=1e-5,
-        rope_base=500000,
-        scale_factor=32
-    )
+# Define model configurations
+def llama_3_2_1b():  # Fixed naming to match what's imported
+    return {
+        "vocab_size": 128256,
+        "num_layers": 16,
+        "num_heads": 32,
+        "num_kv_heads": 8,
+        "embed_dim": 2048,
+        "max_seq_len": 2048,
+        "intermediate_dim": 8192,
+        "attn_dropout": 0.0,
+        "norm_eps": 1e-5,
+        "rope_base": 500000,
+        "scale_factor": 32
+    }
 
-def llama3_2_100m():
-    return llama3_2.llama3_2(
-        vocab_size=128256,
-        num_layers=4,
-        num_heads=8,
-        num_kv_heads=2,
-        embed_dim=1024,
-        max_seq_len=2048,
-        intermediate_dim=8192,
-        attn_dropout=0.0,
-        norm_eps=1e-5,
-        rope_base=500000,
-        scale_factor=32
-    )
+def llama_3_2_100m():
+    return {
+        "vocab_size": 128256,
+        "num_layers": 4,
+        "num_heads": 8,
+        "num_kv_heads": 2,
+        "embed_dim": 1024,
+        "max_seq_len": 2048,
+        "intermediate_dim": 8192,
+        "attn_dropout": 0.0,
+        "norm_eps": 1e-5,
+        "rope_base": 500000,
+        "scale_factor": 32
+    }
 
 FLAVORS = {
-    "llama-1B": llama3_2_1b,
-    "llama-100M": llama3_2_100m,
+    "llama-1B": llama_3_2_1b,
+    "llama-100M": llama_3_2_100m,
 }
 
-def _prepare_transformer(model):
-    embed_dim = model.tok_embeddings.embedding_dim
-    model.tok_embeddings = nn.Identity()
-    model.output = nn.Identity()
-    return model, embed_dim
+def _prepare_transformer(model_config):
+    embed_dim = model_config["embed_dim"]
+    return model_config, embed_dim
 
 def _create_causal_mask(seq_len: int, device: torch.device):
     return torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=device))
@@ -83,7 +85,57 @@ class ModelArgs:
     audio_vocab_size: int
     audio_num_codebooks: int
 
-class Model(nn.Module, PyTorchModelHubMixin):
+    @classmethod
+    def from_local_config(cls, model_dir: str = None):
+        """Load model configuration from local directory"""
+        if model_dir is None:
+            # Try to find models in the repository structure
+            PROJECT_ROOT = Path(__file__).parent.parent.parent
+            model_dir = PROJECT_ROOT / "models"
+        
+        # Default configuration for CSM-1B
+        return cls(
+            backbone_flavor="llama-1B",
+            decoder_flavor="llama-100M",
+            text_vocab_size=128256,  # Standard for Llama tokenizer
+            audio_vocab_size=1024,   # Standard for CSM-1B
+            audio_num_codebooks=32   # Standard for CSM-1B
+        )
+
+def load_local_model(model_path: str = None):
+    """Load a model from local files only"""
+    if model_path is None:
+        PROJECT_ROOT = Path(__file__).parent.parent.parent
+        potential_paths = [
+            PROJECT_ROOT / "models" / "csm-1b" / "csm_weights.pt",
+            PROJECT_ROOT / "models" / "csm-1b" / "csm-1b.pt",
+            PROJECT_ROOT / "models" / "csm-1b.pt",
+            Path("/models/csm-1b/csm_weights.pt"),
+        ]
+        
+        for path in potential_paths:
+            if path.exists():
+                model_path = path
+                print(f"Found model at: {model_path}")
+                break
+    
+    if model_path is None or not Path(model_path).exists():
+        raise FileNotFoundError(f"Could not find model file in expected locations")
+    
+    # Initialize model with default args
+    args = ModelArgs.from_local_config()
+    model = Model(args)
+    
+    # Load weights
+    state_dict = torch.load(model_path, map_location='cpu')
+    model.load_state_dict(state_dict)
+    
+    return model
+
+# Export the functions that are imported elsewhere
+llama3_2_1B = llama_3_2_1b  # Alias for backward compatibility
+
+class Model(nn.Module):
     def __init__(self, config: ModelArgs):
         super().__init__()
         self.config = config
