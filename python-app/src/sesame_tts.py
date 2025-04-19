@@ -6,7 +6,11 @@ import asyncio
 import tempfile
 import subprocess
 from datetime import datetime
-from generator import load_csm_1b_local
+import logging
+from pathlib import Path
+from generator import load_csm_1b
+
+logger = logging.getLogger(__name__)
 
 # Add the conversion function
 def convert_to_mp3(wav_file, mp3_file):
@@ -28,63 +32,66 @@ def convert_to_mp3(wav_file, mp3_file):
 
 class SesameTTS:
     def __init__(self, device="cpu", model_dir=None):
-        """Initialize the Sesame CSM-1B TTS system"""
-        print(f"INFO:     Initializing SesameTTS with device={device}, model_dir={model_dir}")
-        
-        # Disable Triton compilation which can cause issues
+        logger.info(f"Initializing SesameTTS with device={device}, model_dir={model_dir}")
         os.environ["NO_TORCH_COMPILE"] = "1"
-        
-        # Determine model directory relative to project root if not absolute
+
+        # Resolve model directory
         if model_dir is None or not os.path.isabs(model_dir):
-            from models import PROJECT_ROOT # Import from models.py
-            resolved_model_dir = PROJECT_ROOT / (model_dir or "models")
-            print(f"INFO:     Resolved model directory to: {resolved_model_dir}")
+            try:
+                from models import PROJECT_ROOT
+                resolved_model_dir = PROJECT_ROOT / (model_dir or "models")
+                logger.info(f"Resolved model directory to: {resolved_model_dir}")
+            except ImportError:
+                 logger.error("Could not import PROJECT_ROOT from models.py. Using relative path.")
+                 resolved_model_dir = Path(model_dir or "models")
         else:
-            resolved_model_dir = model_dir
-        
+            resolved_model_dir = Path(model_dir)
+
         try:
-            # Set environment variables for HuggingFace to find models locally
+            # Set env vars if needed
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
-            os.environ["HF_DATASETS_OFFLINE"] = "1"
             os.environ["HF_HOME"] = str(resolved_model_dir)
             os.environ["HUGGINGFACE_HUB_CACHE"] = str(resolved_model_dir)
-            
-            # Set the paths to the model explicitly
-            print(f"INFO:     Loading CSM model from {resolved_model_dir}")
-            self.generator = load_csm_1b_local(device=device, model_dir=resolved_model_dir)
+
+            logger.info(f"Loading CSM model via load_csm_1b from generator.py (Path: {resolved_model_dir})...")
+            # Call the load_csm_1b function which now handles local loading
+            # Pass the resolved Path object
+            self.generator = load_csm_1b(device=device, model_dir=resolved_model_dir)
+
+            if not hasattr(self.generator, 'generate') or not hasattr(self.generator, 'sample_rate'):
+                 raise TypeError("Loaded generator object does not have expected 'generate' method or 'sample_rate' attribute.")
+
             self.sample_rate = self.generator.sample_rate
-            print(f"INFO:     CSM model loaded successfully, sample_rate={self.sample_rate}")
-            self.tts_available = True # Assume success if loader doesn't raise exception
+            logger.info(f"SesameTTS initialized successfully. Generator loaded. Sample Rate: {self.sample_rate}")
+            self.tts_available = True
+
         except Exception as e:
-            print(f"ERROR:    Failed to initialize CSM model: {str(e)}")
+            logger.error(f"Failed to initialize SesameTTS: {str(e)}", exc_info=True)
             self.generator = None
-            self.sample_rate = 24000  # Default sample rate for CSM
+            self.sample_rate = 24000
             self.tts_available = False
-            print(f"INFO:     Using fallback audio generator")
+            logger.info(f"Using fallback (silent) audio generator due to initialization error.")
     
     async def generate_audio_and_convert(self, text, speaker_id=0, output_dir="static/audio"):
         """Generates audio, saves as WAV, converts to MP3, returns MP3 path."""
         if not self.tts_available or self.generator is None:
-            print("WARN: TTS not available, skipping audio generation.")
-            return None # Indicate failure
+            logger.warning("TTS not available/loaded, skipping audio generation.")
+            return None
 
         try:
             start_time = asyncio.get_event_loop().time()
-            print(f"INFO: Generating audio for speaker {speaker_id}: '{text[:30]}...'")
+            logger.info(f"TTS generating audio for speaker {speaker_id}: '{text[:30]}...'")
 
-            # --- Call the actual generate method of the loaded generator ---
-            # This depends on the object returned by load_csm_1b_local
-            # Assuming it has a .generate() method matching the script's usage
+            # Call the generate method of the Generator instance
             audio_tensor = self.generator.generate(
                 text=text,
                 speaker=speaker_id,
-                context=[], # Provide context if needed
-                max_audio_length_ms=20_000, # Or adjust as needed
-            )
-            # --- End generate call ---
+                context=[], # Pass context if available/needed
+                max_audio_length_ms=20_000,
+            ) # Output should be on CPU already based on Generator.generate
 
             generation_time = (asyncio.get_event_loop().time() - start_time) * 1000
-            print(f"INFO: Audio tensor generated in {generation_time:.2f} ms, shape={audio_tensor.shape}")
+            logger.info(f"Audio tensor generated in {generation_time:.2f} ms, shape={audio_tensor.shape}")
 
             # Create unique filename
             os.makedirs(output_dir, exist_ok=True)
@@ -93,34 +100,26 @@ class SesameTTS:
             wav_file = os.path.join(output_dir, f"{base_filename}.wav")
             mp3_file = os.path.join(output_dir, f"{base_filename}.mp3")
 
-            # Save WAV
-            # Ensure tensor is on CPU and has correct shape [channels, samples]
-            # CSM output might be [1, samples] or [samples], adjust accordingly
-            if audio_tensor.ndim == 1:
-                audio_tensor = audio_tensor.unsqueeze(0) # Add channel dim if needed
+            # Save WAV (tensor must be on CPU)
             torchaudio.save(wav_file, audio_tensor.cpu(), self.sample_rate)
-            print(f"Audio saved to {wav_file}")
+            logger.info(f"Audio saved to {wav_file}")
 
             # Convert to MP3
+            conversion_start_time = asyncio.get_event_loop().time()
             if convert_to_mp3(wav_file, mp3_file):
-                # Optionally remove WAV file after successful conversion
-                try:
-                    os.remove(wav_file)
-                    print(f"Removed temporary WAV: {wav_file}")
-                except OSError as e:
-                    print(f"Warning: Could not remove temp WAV file: {e}")
+                conversion_time_ms = (asyncio.get_event_loop().time() - conversion_start_time) * 1000
+                logger.info(f"MP3 conversion successful in {conversion_time_ms:.2f} ms.")
+                # Optionally remove WAV
+                try: os.remove(wav_file)
+                except OSError as e: logger.warning(f"Could not remove temp WAV file: {e}")
                 return mp3_file # Return path to the MP3
             else:
-                print("ERROR: MP3 conversion failed.")
-                # Decide fallback: return WAV path or None?
-                return None # Indicate failure if MP3 is required
+                logger.error("MP3 conversion failed.")
+                return None # Indicate failure
 
-        except AttributeError as e:
-             print(f"ERROR: Generator object missing expected method (e.g., 'generate'): {e}")
-             return None
         except Exception as e:
-            print(f"ERROR: Audio generation/conversion failed: {str(e)}")
-            return None # Indicate failure
+            logger.error(f"Audio generation/conversion failed: {str(e)}", exc_info=True)
+            return None
 
 # Example usage
 if __name__ == "__main__":

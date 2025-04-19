@@ -5,20 +5,26 @@ import torch
 import torchaudio
 from models import Model, ModelArgs, llama3_2_1B
 from tokenizers.processors import TemplateProcessing
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoProcessor, AutoModelForCausalLM, ClapModel
 import os
 import json
 from pathlib import Path
 import logging
 from subprocess import run
+from huggingface_hub import hf_hub_download
+from moshi.models import loaders as moshi_loaders
 
 # Force CPU usage for all operations
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 # Use PROJECT_ROOT defined in models.py or redefine if needed
-# from models import PROJECT_ROOT # Option 1: Import if defined globally there
-PROJECT_ROOT = Path(__file__).parent.parent.parent # Option 2: Redefine here
+try:
+    from models import PROJECT_ROOT
+except ImportError:
+    PROJECT_ROOT = Path(__file__).parent.parent.parent
 print(f"INFO: [generator.py] PROJECT_ROOT set to: {PROJECT_ROOT}")
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Segment:
@@ -89,8 +95,7 @@ class Generator:
         torch.load = patched_torch_load
         
         try:
-            from moshi.models import loaders
-            mimi = loaders.get_mimi(mimi_path, device=self.device)
+            mimi = moshi_loaders.get_mimi(mimi_path, device=self.device)
             mimi.set_num_codebooks(32)
             self._audio_tokenizer = mimi
             print(f"INFO:     Mimi audio tokenizer loaded successfully")
@@ -223,30 +228,41 @@ class Generator:
                 # Just return the audio tensor
                 return audio
 
-def load_csm_1b_local(device='cpu', model_dir=None):
-    print(f"INFO: [generator.py] Attempting to load CSM model...")
-    print(f"INFO: Device={device}, Model Dir={model_dir}")
-    # --- Actual Loading Logic Here ---
-    # Find model files using PROJECT_ROOT and model_dir
-    # Initialize and load weights for processor, clap, encodec, generator
-    # Return a dictionary or object representing the loaded generator
-    # Example structure:
-    # return {
-    #     'processor': loaded_processor,
-    #     'clap': loaded_clap,
-    #     'encodec': loaded_encodec,
-    #     'generator': loaded_generator_model, # This is the core TTS model
-    #     'sample_rate': 24000,
-    #     'generate': lambda text, speaker, context, max_audio_length_ms: torch.zeros(1, 24000) # Placeholder generate method
-    # }
-    # For now, return a dummy object to avoid errors during setup
-    class DummyGenerator:
-        sample_rate = 24000
-        def generate(self, text, speaker, context, max_audio_length_ms):
-            print("WARN: [DummyGenerator] Generating silent audio.")
-            return torch.zeros(1, self.sample_rate) # Return 1 second of silence
-    print("WARN: [generator.py] Using dummy CSM model loader.")
-    return DummyGenerator()
+def load_csm_1b(device: str = "cpu", model_dir: Path = None) -> Generator:
+    """Loads the CSM model locally using Model.from_local_pretrained and returns the Generator."""
+    if model_dir is None:
+        model_dir = PROJECT_ROOT / "models"
+    logger.info(f"Attempting to load CSM-1B model from local directory: {model_dir}")
 
-# Alias for potential backward compatibility
-load_csm_1b = load_csm_1b_local
+    csm_model_path = model_dir / "csm-1b" # Path to the directory
+
+    if not csm_model_path.exists():
+        logger.error(f"CSM model directory not found: {csm_model_path}")
+        raise FileNotFoundError(f"CSM model directory not found at {csm_model_path}")
+
+    # --- Load using Model.from_local_pretrained ---
+    try:
+        logger.info(f"Calling Model.from_local_pretrained for path: {csm_model_path}")
+        # This uses the method defined in models.py which handles safetensors/pytorch loading
+        model = Model.from_local_pretrained(str(csm_model_path), device=device)
+
+        # Optional: Convert to bfloat16 if needed
+        if device != 'cpu' and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+             logger.info("Converting loaded model to bfloat16.")
+             model = model.to(torch.bfloat16)
+
+    except Exception as e:
+        # Log the specific error from our loading function
+        logger.error(f"Failed to load model using Model.from_local_pretrained from {csm_model_path}: {e}", exc_info=True)
+        raise # Re-raise the underlying loading error
+
+    # Initialize the Generator class with the loaded model
+    try:
+        logger.info("Initializing Generator class with loaded model...")
+        # Pass the model object (already loaded)
+        generator = Generator(model, device=device)
+        logger.info("Generator initialized successfully.")
+        return generator
+    except Exception as e:
+        logger.error(f"Failed to initialize Generator class after loading model: {e}", exc_info=True)
+        raise

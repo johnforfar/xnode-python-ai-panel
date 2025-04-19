@@ -1,28 +1,97 @@
 # ./python-app/src/main.py
 import os
-os.chdir(os.path.dirname(__file__))  # Set working directory to ./python-app/src
+# Set working directory EARLY before other imports might trigger logging
+# Note: This assumes main.py is run from within python-app/src
+# If run from root, adjust path finding or remove os.chdir
+app_dir = os.path.dirname(__file__)
+os.chdir(app_dir)
+print(f"INFO: Changed working directory to: {os.getcwd()}") # Confirm CWD
 
 import logging
+import logging.handlers # For file handler
+from pathlib import Path
+import asyncio # Keep other standard lib imports here
+import time
+import re
+from datetime import datetime
+
+# --- Logging Setup ---
+# Determine project root relative to this file's location (src)
+PROJECT_ROOT = Path(app_dir).parent.parent
+LOG_FILE = PROJECT_ROOT / "logs.txt"
+
+# Ensure log directory exists (optional, if you want logs in a subdir)
+# LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+# Configure root logger
+log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
+log_level = logging.INFO # Set default level
+
+# Create File Handler (Mode 'w' wipes the file on each run)
+try:
+    # Attempt to open in 'w' mode first to clear it
+    with open(LOG_FILE, 'w') as f:
+         f.write("--- Log Start ---\n") # Write a header
+    file_handler = logging.FileHandler(LOG_FILE, mode='a') # Append after initial wipe
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(log_level) # Log INFO and above to file
+    logging.getLogger().addHandler(file_handler)
+    print(f"INFO: Logging configured to file: {LOG_FILE}")
+except Exception as e:
+    print(f"ERROR: Failed to configure file logging to {LOG_FILE}: {e}")
+    # Continue without file logging if setup fails
+
+
+# Create Console Handler (to still see *some* output)
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+# Set console level higher to reduce verbosity (e.g., WARNING)
+# You'll still see INFO from our direct logger calls below, but less library noise
+console_handler.setLevel(logging.WARNING)
+logging.getLogger().addHandler(console_handler)
+
+# Set root logger level (acts as a filter *before* handlers)
+# Set to INFO so file handler gets INFO, console handler filters further
+logging.getLogger().setLevel(logging.INFO)
+
+# --- Reduce Verbosity of Specific Libraries ---
+# Set transformers logger level higher to suppress its INFO messages on console
+logging.getLogger("transformers").setLevel(logging.WARNING)
+# Set huggingface_hub logger level higher
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+# Set torchtune logger level higher (if it exists and is noisy)
+logging.getLogger("torchtune").setLevel(logging.WARNING)
+# Set datasets logger level higher
+logging.getLogger("datasets").setLevel(logging.WARNING)
+
+# Get our application-specific logger AFTER basicConfig is set
+logger = logging.getLogger(__name__) # Use the name of the current module (__main__)
+logger.info("Application logger initialized.") # This INFO message will go to file, but not console (by default)
+
+# Ensure the static/audio directory exists (optional for now)
+# os.makedirs("static/audio", exist_ok=True)
+
+# --- Third-Party Imports (Move FastAPI here) ---
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
+from starlette.websockets import WebSocketDisconnect # Already imported via FastAPI, but explicit doesn't hurt
+import torch
+import torchaudio
 import aiohttp
-import re
-from datetime import datetime
-from uagents import Agent, Context, Model # Assuming uagents is still needed for Agent definition
-import time
+from uagents import Agent, Context, Model # Assuming still needed
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# --- Application Imports ---
+from sesame_tts import SesameTTS
+# from models import ... # If needed directly in main.py
+# from generator import ... # If needed directly in main.py
 
-# Ensure the static/audio directory exists (optional for now)
-# os.makedirs("static/audio", exist_ok=True)
 
-app = FastAPI()
+# --- FastAPI App Initialization ---
+logger.info("Initializing FastAPI app...")
+app = FastAPI() # Now FastAPI is defined
 
 # Add CORS middleware (Important for WebSocket connections)
 app.add_middleware(
@@ -54,18 +123,12 @@ conversation_history = []
 
 # Initialize TTS (adjust model_dir if needed)
 try:
-    # Use relative path from project root for consistency
-    from models import PROJECT_ROOT
-    tts_model_dir = PROJECT_ROOT / "models"
-    logger.info(f"Attempting to initialize TTS with model dir: {tts_model_dir}")
-    tts = SesameTTS(device="cpu", model_dir=str(tts_model_dir))
+    logger.info(f"Attempting to initialize TTS with model dir: {PROJECT_ROOT / 'models'}")
+    tts = SesameTTS(device="cpu", model_dir=str(PROJECT_ROOT / "models"))
     tts_available = tts.tts_available
-except ImportError:
-    logger.error("Could not import PROJECT_ROOT from models.py. Using default TTS init.")
-    tts = SesameTTS(device="cpu") # Fallback init
-    tts_available = False
+    logger.info(f"TTS Available: {tts_available}")
 except Exception as e:
-    logger.error(f"Unhandled exception during TTS init: {e}")
+    logger.error(f"Unhandled exception during TTS init: {e}", exc_info=True) # Log full traceback to file
     tts = None
     tts_available = False
 
@@ -300,4 +363,6 @@ async def run_conversation_loop(websocket: WebSocket, num_agents: int, max_turns
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting Uvicorn server...")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info") # Use uvicorn's logging
+    # Pass log_config=None to prevent uvicorn from overriding our setup
+    # Uvicorn's access logs will still go to console based on its defaults
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_config=None)
