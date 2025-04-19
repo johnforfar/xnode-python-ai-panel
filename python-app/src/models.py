@@ -86,16 +86,6 @@ def _create_causal_mask(seq_len: int, device: torch.device):
     # Creates a lower triangular mask for causal attention.
     return torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=device))
 
-def _index_causal_mask(mask: torch.Tensor, input_pos: torch.Tensor):
-    """Indexes the causal mask based on input positions."""
-    # Ensure mask and input_pos are compatible.
-    # This implementation assumes input_pos contains indices valid for the mask's first dimension.
-    try:
-        return mask[input_pos]
-    except IndexError as e:
-        logger.error(f"IndexError in _index_causal_mask: mask shape {mask.shape}, input_pos shape {input_pos.shape}, input_pos max {input_pos.max() if input_pos.numel() > 0 else 'N/A'}. Error: {e}")
-        raise
-
 def _multinomial_sample_one_no_sync(probs):
     # Efficient multinomial sampling.
     q = torch.empty_like(probs).exponential_(1)
@@ -149,6 +139,7 @@ class Model(*BaseModelClass):
     def __init__(self, config: ModelArgs):
         super().__init__()
         self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}") # Add logger to class instance if needed
 
         logger.info(f"Initializing Model with config: {config}")
         logger.info(f"Initializing backbone: {config.backbone_flavor}")
@@ -169,143 +160,219 @@ class Model(*BaseModelClass):
         self.audio_head = nn.Parameter(torch.empty(config.audio_num_codebooks - 1, decoder_dim, config.audio_vocab_size))
         # Optional: Initialize weights (e.g., Kaiming uniform) if needed, otherwise they load from state_dict
         # nn.init.kaiming_uniform_(self.audio_head, a=math.sqrt(5))
-        logger.info("Model components initialized.")
+        logger.info("Model components initialized (KV Caching ENABLED).")
 
+    # --- RESTORE _index_causal_mask from OLD version ---
+    def _index_causal_mask(mask: torch.Tensor, input_pos: torch.Tensor):
+        """
+        Indexes a square causal mask using a tensor of indices.
+        Args:
+            mask: (max_seq_len, max_seq_len)
+            input_pos: (batch_size, seq_len)
+        Returns:
+            (batch_size, seq_len, max_seq_len)
+        """
+        logger.debug(f"--- _index_causal_mask (Old Version) ---")
+        logger.debug(f"  Input mask shape: {mask.shape}")
+        logger.debug(f"  Input indices (input_pos) shape: {input_pos.shape}")
+        try:
+            # Select rows based on input_pos
+            r = mask[input_pos, :]
+            logger.debug(f"  Output mask shape: {r.shape}")
+            return r
+        except IndexError as e:
+            logger.error(f"  IndexError in _index_causal_mask: {e}", exc_info=True)
+            logger.error(f"  Max index requested: {input_pos.max().item() if input_pos.numel() > 0 else 'N/A'}")
+            logger.error(f"  Mask dimension size: {mask.shape[0]}")
+            raise
+        except Exception as e:
+            logger.error(f"  Unexpected error in _index_causal_mask: {e}", exc_info=True)
+            raise
+    # --- End Restore ---
 
     def setup_caches(self, max_batch_size: int) -> None:
         """Setup KV caches and causal masks."""
-        dtype = next(self.parameters()).dtype
         device = next(self.parameters()).device
+        self.logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}")
 
-        logger.info(f"Setting up caches for batch_size={max_batch_size}, dtype={dtype}, device={device}")
         with torch.device(device):
-            # --- Backbone Cache Setup (Keep as corrected before) ---
+            # Setup backbone cache - try without dtype
             if hasattr(self.backbone, 'setup_caches'):
                  try:
-                      self.backbone.setup_caches(batch_size=max_batch_size, dtype=dtype)
-                      logger.info("Backbone caches setup called with batch_size and dtype.")
-                 except TypeError:
-                     try:
-                         self.backbone.setup_caches(max_batch_size, dtype=dtype)
-                         logger.info("Backbone caches setup called positionally with batch_size and dtype.")
-                     except TypeError as e:
-                          logger.error(f"Failed to call backbone.setup_caches: {e}")
+                      self.backbone.setup_caches(batch_size=max_batch_size)
+                      self.logger.info(">>> Backbone caches setup call completed.")
+                 except TypeError as e:
+                      self.logger.error(f"Failed to call backbone.setup_caches: {e}")
+                      # Try original call with dtype as fallback
+                      try:
+                          dtype = next(self.parameters()).dtype
+                          self.logger.warning("Retrying backbone setup_caches WITH dtype...")
+                          self.backbone.setup_caches(batch_size=max_batch_size, dtype=dtype)
+                          self.logger.info(">>> Backbone caches setup call completed (with dtype fallback).")
+                      except Exception as e2:
+                          self.logger.error(f"Fallback backbone setup_caches also failed: {e2}")
                           raise
+                 except Exception as e_other:
+                     self.logger.error(f"Unexpected error during backbone cache setup: {e_other}")
+                     raise
             else:
-                 logger.warning("Backbone model does not have setup_caches method.")
+                 self.logger.warning("Backbone does not have setup_caches method.")
 
-            # --- Decoder Cache Setup (MODIFIED) ---
+            # Setup decoder cache - try without dtype
             if hasattr(self.decoder, 'setup_caches'):
                  try:
-                     # Try calling with ONLY batch_size and dtype
-                     self.decoder.setup_caches(batch_size=max_batch_size, dtype=dtype)
-                     logger.info(f"Decoder caches setup called with batch_size and dtype.")
-                 except TypeError:
-                      try:
-                          # Try positional ONLY with batch_size and dtype
-                          self.decoder.setup_caches(max_batch_size, dtype=dtype)
-                          logger.info(f"Decoder caches setup called positionally with batch_size and dtype.")
-                      except TypeError as e:
-                           logger.error(f"Failed to call decoder.setup_caches with batch_size and dtype: {e}")
-                           # If it fails here, the signature is very unusual
-                           raise
+                     self.decoder.setup_caches(batch_size=max_batch_size)
+                     self.logger.info(f">>> Decoder caches setup call completed.")
+                 except TypeError as e:
+                     self.logger.error(f"Failed to call decoder.setup_caches: {e}")
+                     # Try original call with dtype as fallback
+                     try:
+                          dtype = next(self.parameters()).dtype
+                          self.logger.warning("Retrying decoder setup_caches WITH dtype...")
+                          self.decoder.setup_caches(batch_size=max_batch_size, dtype=dtype)
+                          self.logger.info(f">>> Decoder caches setup call completed (with dtype fallback).")
+                     except Exception as e2:
+                         self.logger.error(f"Fallback decoder setup_caches also failed: {e2}")
+                         raise
+                 except Exception as e_other:
+                     self.logger.error(f"Unexpected error during decoder cache setup: {e_other}")
+                     raise
             else:
-                 logger.warning("Decoder model does not have setup_caches method.")
-            # --- End Modifications ---
+                self.logger.warning("Decoder does not have setup_caches method.")
 
-        # Register buffers for masks (keep as is)
-        backbone_max_seq_len = getattr(self.backbone, 'max_seq_len', 2048)
+        # Register buffers for masks AFTER cache setup
+        backbone_max_seq_len = getattr(self.backbone, 'max_seq_len', 2048) # Get actual max_seq_len if possible
         self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
-        decoder_max_seq_len = self.config.audio_num_codebooks
         self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_max_seq_len, device), persistent=False)
-        logger.info("Causal masks registered.")
+        self.logger.info("Causal mask buffers registered.")
 
-    # --- generate_frame (as provided in original) ---
+    def reset_caches(self):
+        if hasattr(self.backbone, 'reset_caches'):
+            self.backbone.reset_caches()
+            # self.logger.debug("Backbone cache reset.") # Optional debug log
+        if hasattr(self.decoder, 'reset_caches'):
+            self.decoder.reset_caches()
+            # self.logger.debug("Decoder cache reset.") # Optional debug log
+
     def generate_frame(
         self,
         tokens: torch.Tensor,
         tokens_mask: torch.Tensor,
-        input_pos: torch.Tensor,
+        input_pos: torch.Tensor, # Initial input_pos for the backbone
         temperature: float,
         topk: int,
     ) -> torch.Tensor:
-        """Generates one frame of audio tokens."""
+        """Generates one frame of audio tokens (KV Caching ENABLED)."""
+        # --- Start of Changes ---
+        # MODIFY Assertions to check property instead of calling method
+        # Default to False if the attribute doesn't exist
+        backbone_caches_enabled = getattr(self.backbone, 'caches_are_enabled', False)
+        decoder_caches_enabled = getattr(self.decoder, 'caches_are_enabled', False)
+
+        if not backbone_caches_enabled:
+             self.logger.error("Assertion failed: Backbone caches property 'caches_are_enabled' is False or missing!")
+             # Log relevant attributes of self.backbone to help debug
+             self.logger.error(f"Backbone attributes: {dir(self.backbone)}")
+             raise AssertionError("Backbone caches are not enabled. Call setup_caches first.")
+        if not decoder_caches_enabled:
+             self.logger.error("Assertion failed: Decoder caches property 'caches_are_enabled' is False or missing!")
+             # Log relevant attributes of self.decoder
+             self.logger.error(f"Decoder attributes: {dir(self.decoder)}")
+             raise AssertionError("Decoder caches are not enabled. Call setup_caches first.")
+        self.logger.debug("Assertions passed: Cache properties 'caches_are_enabled' are True.")
+        # --- End of Changes ---
+
         dtype = next(self.parameters()).dtype
-        # Ensure caches are enabled if the model uses them
-        # assert self.backbone.caches_are_enabled(), "backbone caches are not enabled"
+        device = next(self.parameters()).device
 
-        # Get current mask slice based on positions
-        # Ensure input_pos are valid indices for backbone_causal_mask
-        max_pos = input_pos.max()
-        if max_pos >= self.backbone_causal_mask.shape[0]:
-             logger.error(f"input_pos max index ({max_pos}) out of bounds for backbone_causal_mask shape {self.backbone_causal_mask.shape}")
-             # Handle error appropriately, maybe raise or return error indicator
-             raise IndexError("input_pos out of bounds for backbone mask")
-        curr_backbone_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
-
+        # --- Backbone Section (Keep restored logic) ---
         embeds = self._embed_tokens(tokens)
-        masked_embeds = embeds * tokens_mask.unsqueeze(-1) # Apply mask
-        # Sum embeddings across the codebook+text dimension
+        masked_embeds = embeds * tokens_mask.unsqueeze(-1)
         h = masked_embeds.sum(dim=2)
+        self.logger.debug(f"--- Backbone Call (Cache Enabled) ---")
+        self.logger.debug(f"  Input h shape: {h.shape}")
+        self.logger.debug(f"  Input input_pos shape: {input_pos.shape}, values:\n{input_pos}")
 
-        # Pass through backbone
-        # Handle models with/without cache enabled status check
-        backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask)
-        h = backbone_output.to(dtype=dtype)
+        try:
+            # Calculate mask using the OLD restored _index_causal_mask
+            curr_backbone_mask = self._index_causal_mask(self.backbone_causal_mask, input_pos)
+            self.logger.debug(f"  Calculated curr_backbone_mask shape: {curr_backbone_mask.shape}")
+        except Exception as e:
+            self.logger.error(f"Error indexing backbone causal mask: {e}", exc_info=True)
+            raise ValueError(f"Failed to create backbone mask: {e}") from e
 
+        try:
+            # Call backbone WITH input_pos and the calculated mask
+            backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask)
+            self.logger.debug(f"  Backbone output shape: {backbone_output.shape}")
+            h = backbone_output.to(dtype=dtype)
+        except Exception as e:
+             self.logger.error(f"--- ERROR during self.backbone call (Cache Enabled) ---")
+             self.logger.error(f"  Exception: {e}", exc_info=False)
+             self.logger.error(f"  Input h shape: {h.shape}")
+             self.logger.error(f"  Input input_pos shape: {input_pos.shape}")
+             self.logger.error(f"  Input curr_backbone_mask shape: {curr_backbone_mask.shape if curr_backbone_mask is not None else 'None'}")
+             raise
+        # --- End Backbone Section ---
 
-        # Process last hidden state for codebook 0
-        last_h = h[:, -1, :] # Get hidden state of the last token in the sequence
+        # --- Decoder Section (Keep restored logic) ---
+        last_h = h[:, -1, :]
         c0_logits = self.codebook0_head(last_h)
         c0_sample = sample_topk(c0_logits, topk, temperature)
-        c0_embed = self._embed_audio(0, c0_sample) # Get embedding for the sampled token
-
-        # Prepare input for the decoder loop
-        # Input includes the backbone's last hidden state and the embedding of the first sampled codebook token
+        c0_embed = self._embed_audio(0, c0_sample)
         curr_h = torch.cat([last_h.unsqueeze(1), c0_embed], dim=1)
-        curr_sample = c0_sample.clone() # Start accumulating sampled tokens
-        # Decoder positions start from 0 for the first input (last_h)
+        curr_sample = c0_sample.clone()
         curr_pos = torch.arange(0, curr_h.size(1), device=curr_h.device).unsqueeze(0).repeat(curr_h.size(0), 1)
 
-        # Reset decoder caches for each new frame generation
-        if hasattr(self.decoder, 'reset_caches'):
-            self.decoder.reset_caches()
+        # Check if decoder_causal_mask exists (important after restoring setup_caches)
+        if not hasattr(self, 'decoder_causal_mask'):
+             self.logger.error("self.decoder_causal_mask not found after setup_caches!")
+             raise AttributeError("Model is missing 'decoder_causal_mask', cannot generate.")
 
-        # Loop through remaining codebooks (1 to N-1)
+        # Decoder loop
         for i in range(1, self.config.audio_num_codebooks):
-            # Get the mask for the current decoder step
-            max_decoder_pos = curr_pos.max()
-            if max_decoder_pos >= self.decoder_causal_mask.shape[0]:
-                 logger.error(f"curr_pos max index ({max_decoder_pos}) out of bounds for decoder_causal_mask shape {self.decoder_causal_mask.shape}")
-                 raise IndexError("curr_pos out of bounds for decoder mask")
-            curr_decoder_mask = _index_causal_mask(self.decoder_causal_mask, curr_pos)
+            try:
+                # --- ADD Decoder Cache Reset (from old version) ---
+                if hasattr(self.decoder, 'reset_caches'):
+                    self.decoder.reset_caches()
+                # --- End Add ---
 
-            # Pass projected hidden state through the decoder
-            # The input to the decoder is the embedding from the *previous* step (or last_h initially)
-            decoder_input = self.projection(curr_h)
-            decoder_output = self.decoder(decoder_input, input_pos=curr_pos, mask=curr_decoder_mask)
-            decoder_h = decoder_output.to(dtype=dtype)
+                decoder_input = self.projection(curr_h)
+                try:
+                    # Calculate mask using the OLD restored _index_causal_mask
+                    curr_decoder_mask = self._index_causal_mask(self.decoder_causal_mask, curr_pos)
+                except Exception as e:
+                    self.logger.error(f"Error indexing decoder causal mask at step {i}: {e}", exc_info=True)
+                    raise ValueError(f"Failed to create decoder mask at step {i}: {e}") from e
 
-            # Get logits for the current codebook using the specific head
-            # Use the hidden state corresponding to the *last* input token for prediction
+                self.logger.debug(f"--- Decoder Step {i} (Cache Enabled) ---")
+                self.logger.debug(f"  Input decoder_input shape: {decoder_input.shape}")
+                self.logger.debug(f"  Input curr_pos shape: {curr_pos.shape}, values:\n{curr_pos}")
+                self.logger.debug(f"  Calculated curr_decoder_mask shape: {curr_decoder_mask.shape}")
+
+                # Call decoder WITH input_pos and the calculated mask
+                decoder_output = self.decoder(decoder_input, input_pos=curr_pos, mask=curr_decoder_mask)
+
+                decoder_h = decoder_output.to(dtype=dtype)
+                self.logger.debug(f"  Output decoder_h shape: {decoder_h.shape}")
+
+            except Exception as e:
+                self.logger.error(f"--- ERROR during self.decoder call at step {i} (Cache Enabled) ---")
+                self.logger.error(f"  Exception: {e}", exc_info=False)
+                self.logger.error(f"  Input decoder_input shape: {decoder_input.shape}")
+                self.logger.error(f"  Input curr_pos shape: {curr_pos.shape}, values:\n{curr_pos}")
+                self.logger.error(f"  Input curr_decoder_mask shape: {curr_decoder_mask.shape if curr_decoder_mask is not None else 'None'}")
+                raise
+
             ci_logits = torch.mm(decoder_h[:, -1, :], self.audio_head[i - 1])
             ci_sample = sample_topk(ci_logits, topk, temperature)
-            ci_embed = self._embed_audio(i, ci_sample) # Embed the newly sampled token
-
-            # Update the input for the *next* decoder step
-            curr_h = ci_embed # Input for next step is the embedding of the token just sampled
-            curr_sample = torch.cat([curr_sample, ci_sample], dim=1) # Add sample to the frame
-            # Increment position for the next step
+            ci_embed = self._embed_audio(i, ci_sample)
+            curr_h = ci_embed
+            curr_sample = torch.cat([curr_sample, ci_sample], dim=1)
             curr_pos = curr_pos[:, -1:] + 1
+        # --- End Decoder Section ---
 
-        return curr_sample # Return the complete frame of sampled tokens
-
-    # --- reset_caches (as provided) ---
-    def reset_caches(self):
-        if hasattr(self.backbone, 'reset_caches'): self.backbone.reset_caches()
-        if hasattr(self.decoder, 'reset_caches'): self.decoder.reset_caches()
-        logger.debug("Model caches reset.")
-
+        return curr_sample
 
     # --- Embedding helpers (as provided) ---
     def _embed_audio(self, codebook: int, tokens: torch.Tensor) -> torch.Tensor:
