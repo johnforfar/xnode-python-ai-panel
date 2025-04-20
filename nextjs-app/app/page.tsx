@@ -19,10 +19,19 @@ interface PanelStatus {
     timestamp: string;
 }
 
+// --- Add type for Backend Test result ---
+interface BackendTestResult {
+  ok: boolean;
+  message: string;
+  cause?: string;
+}
+
 export default function Home() {
   // --- State Declarations ---
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
   const [panelStatus, setPanelStatus] = useState<PanelStatus | null>(null);
+  // --- Add state for backend test ---
+  const [backendTest, setBackendTest] = useState<BackendTestResult | null>(null);
   const [numAgents, setNumAgents] = useState<number>(2); // For the input field
   const [isLoading, setIsLoading] = useState(false); // Generic loading state for API calls
   const [error, setError] = useState<string | null>(null); // For displaying errors
@@ -133,10 +142,36 @@ export default function Home() {
       }
   };
 
+  // --- ADDED: Function to fetch backend test status ---
+  const fetchBackendTest = async () => {
+    console.log("Frontend: Fetching backend test status...");
+    setBackendTest(null); // Reset before fetch
+    try {
+      const response = await fetch(`/api/panel/test`); // Call the new Next.js API route
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Use error details from the proxied response
+        setBackendTest({ ok: false, message: data.error || `HTTP error ${response.status}`, cause: data.cause });
+        console.error("Frontend: Backend test failed:", data);
+      } else {
+        // Assuming backend /api/test returns {status: "ok", message: "..."} on success
+        setBackendTest({ ok: data.status === 'ok' || response.ok, message: data.message || "Backend test responded." });
+        console.log("Frontend: Backend test successful:", data);
+      }
+    } catch (err: any) {
+      console.error("Frontend: Error fetching backend test status:", err);
+      setBackendTest({ ok: false, message: "Failed to fetch backend test status.", cause: err.message });
+    }
+  };
+  // --- End of new function ---
+
   // --- Effects ---
 
   // Initial fetch and polling
   useEffect(() => {
+    // --- Call the new test function on initial load ---
+    fetchBackendTest();
     fetchStatus();
     fetchConversation(); // Fetch initial data
 
@@ -145,6 +180,8 @@ export default function Home() {
         if (panelStatus?.active || conversation.length === 0) {
              fetchConversation();
         }
+        // Optionally re-run test periodically if needed
+        // fetchBackendTest();
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(intervalId); // Cleanup interval on unmount
@@ -189,6 +226,12 @@ export default function Home() {
 
             {/* Status Display */}
             <div className="text-center">
+                {/* --- Display Backend Test Status --- */}
+                <div className="text-xs mb-1">
+                    {backendTest === null && <span className="text-gray-400">Backend Test: Checking...</span>}
+                    {backendTest?.ok && <span className="text-green-400">Backend Test: OK</span>}
+                    {backendTest && !backendTest.ok && <span className="text-red-400" title={`Cause: ${backendTest.cause}`}>Backend Test: FAIL</span>}
+                </div>
                 <p className={`text-lg font-semibold ${panelStatus?.active ? 'text-green-400' : 'text-yellow-400'}`}>
                     Status: {panelStatus?.status ?? "Loading..."}
                 </p>

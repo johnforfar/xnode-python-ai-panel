@@ -103,7 +103,7 @@ The application uses FastAPI to serve a web interface where users can initiate a
 
 ## Usage
 
-1.  Open your web browser and navigate to `http://localhost:8000`.
+1.  Open your web browser and navigate to `http://127.0.0.1:8000`.
 2.  You should see the "AI Panel Discussion" interface.
 3.  The status bar will indicate the WebSocket connection status ("Connected").
 4.  Select the number of agents (1-2 based on current configuration) to participate.
