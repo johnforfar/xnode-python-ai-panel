@@ -12,17 +12,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(n
 logger = logging.getLogger(__name__)
 logger.info("--- app.py: Script Start ---")
 
-# --- Import Core Logic ---
-# Import the PanelManager class and create a single instance
+# --- Fix the import line ---
+# Remove PanelManager as it doesn't exist in main.py
 try:
-    # Assuming PanelManager and AGENTS are defined in main.py
-    from main import PanelManager, AGENTS
-    logger.info("Successfully imported PanelManager from main.py")
-    panel_manager = PanelManager() # Create the single instance
+    from main import AGENTS # Keep AGENTS as it's defined in main.py
+    # PanelManager removed from import
+    logger.info("Successfully imported AGENTS from main.py")
 except ImportError as e:
-    logger.error(f"Failed to import PanelManager from main.py: {e}. API routes will fail.", exc_info=True)
-    # Exit or provide fallback if core logic is essential for server setup
-    sys.exit(f"CRITICAL: Could not import PanelManager. Ensure main.py exists and is correct. {e}")
+    # Log a critical error if the import fails
+    logger.critical(f"Could not import AGENTS from main.py. Ensure main.py exists and is correct. {e}", exc_info=True)
+    AGENTS = [] # Provide a default empty list to prevent further crashes downstream
+    # Consider exiting if AGENTS is absolutely critical:
+    # import sys
+    # sys.exit(1)
 
 # --- API Handlers (Use the panel_manager instance) ---
 
