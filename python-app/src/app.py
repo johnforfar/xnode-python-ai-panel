@@ -27,13 +27,8 @@ except ImportError as e:
 # --- API Handlers (Use the panel_manager instance) ---
 
 async def handle_test(request):
-    # Access app instance if needed: app = request.app
-    logger.info(">>> /api/test endpoint hit!")
-    return web.json_response({
-        "status": "OK",
-        "message": "Python API test endpoint is working!",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    })
+    logger.info("Test endpoint /api/test called successfully.")
+    return web.json_response({"status": "ok", "message": "Test successful!"})
 
 async def get_status(request):
     logger.info("GET /api/status")
@@ -123,6 +118,7 @@ def setup_routes(app):
 
 # --- Main Execution Block ---
 if __name__ == '__main__':
+    print("--- app.py: ENTERING __main__ ---")
     logger.info("--- Running app.py in __main__ block ---")
     try:
         app = web.Application()
@@ -132,12 +128,15 @@ if __name__ == '__main__':
         setup_routes(app) # Setup routes and CORS
 
         port = int(os.environ.get('PORT', 8000))
+        print(f"--- app.py: ABOUT TO CALL web.run_app on port {port} ---")
         logger.info(f"Attempting to run aiohttp app on port {port}")
         web.run_app(app, host='0.0.0.0', port=port) # Use 0.0.0.0
+        print("--- app.py: web.run_app FINISHED (should only happen on shutdown) ---")
 
         logger.info("--- web.run_app finished ---")
 
     except Exception as e:
+        print(f"--- app.py: CRITICAL ERROR IN __main__: {e} ---") # Print error directly
         logger.error(f"--- CRITICAL ERROR in app.py __main__: {e} ---", exc_info=True)
         sys.exit(1) # Exit with error code
 else:
