@@ -521,6 +521,16 @@ async def handle_stop(request):
 
     return web.json_response({"status": "Panel stopped"})
 
+# --- Add this simple test handler ---
+async def handle_test(request):
+    """ A very simple test endpoint. """
+    print(">>> Python Backend: /api/test endpoint hit!") # Add a print statement here
+    return web.json_response({
+        "status": "OK",
+        "message": "Python backend test endpoint is working!",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    })
+# --- End of test handler ---
 
 # --- Application Setup ---
 async def main_app():
@@ -557,6 +567,11 @@ async def main_app():
 
     stop_resource = cors.add(app.router.add_resource("/api/stop"))
     cors.add(stop_resource.add_route("POST", handle_stop))
+
+    # --- Add the new test route ---
+    test_resource = cors.add(app.router.add_resource("/api/test"))
+    cors.add(test_resource.add_route("GET", handle_test))
+    # --- End of adding test route ---
 
     # --- REMOVE OLD ROUTES ---
     # Make sure any routes serving index.html or static files are removed
