@@ -26,6 +26,9 @@ interface BackendTestResult {
   cause?: string;
 }
 
+// --- Added: WebSocket Connection Status Type ---
+type WsConnectionStatus = "connecting" | "open" | "closing" | "closed" | "error";
+
 export default function Home() {
   // --- State Declarations ---
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
@@ -35,6 +38,11 @@ export default function Home() {
   const [numAgents, setNumAgents] = useState<number>(2); // For the input field
   const [isLoading, setIsLoading] = useState(false); // Generic loading state for API calls
   const [error, setError] = useState<string | null>(null); // For displaying errors
+  // --- Added: WebSocket State ---
+  const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
+  const ws = useRef<WebSocket | null>(null); // Ref to hold the WebSocket instance
+  // *** ADD STATE TO GUARD AGAINST STRICT MODE DOUBLE EFFECT RUN ***
+  const [wsConnectAttempted, setWsConnectAttempted] = useState(false);
 
   // Autoscroll chat to bottom
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -71,21 +79,18 @@ export default function Home() {
     }
   };
 
-  const fetchConversation = async () => {
-     // Fetch conversation from our Next.js API route
+  const fetchInitialConversation = async () => {
     try {
-      const response = await fetch(`/api/panel/conversation`); // Call the Next.js API route
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Failed to parse error" }));
-        throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || 'Unknown conversation error'}`);
-      }
+      console.log("Fetching initial conversation history...");
+      const response = await fetch(`/api/panel/conversation`);
+      if (!response.ok) { /* ... error handling ... */ return; }
       const data = await response.json();
-      // Ensure data.history is an array before setting
       setConversation(Array.isArray(data.history) ? data.history : []);
-      setError(null); // Clear error on success
+      console.log(`Initial history loaded: ${data.history?.length || 0} messages`);
+      setError(null);
     } catch (err: any) {
-      console.error("Error fetching conversation:", err);
-      setError(`Failed to fetch conversation: ${err.message}`);
+        console.error("Error fetching initial conversation:", err);
+        setError(`Failed to load history: ${err.message}`);
     }
   };
 
@@ -107,7 +112,7 @@ export default function Home() {
           console.log('Panel start request sent');
           // Fetch status and conversation soon after to reflect changes
           setTimeout(fetchStatus, 300);
-          setTimeout(fetchConversation, 500);
+          setTimeout(fetchInitialConversation, 500);
       } catch (err: any) {
           console.error("Error starting panel:", err);
           setError(`Start failed: ${err.message}`);
@@ -133,7 +138,7 @@ export default function Home() {
           console.log('Panel stop request sent');
           // Fetch status and conversation soon after
           setTimeout(fetchStatus, 300);
-          setTimeout(fetchConversation, 500);
+          setTimeout(fetchInitialConversation, 500);
       } catch (err: any) {
           console.error("Error stopping panel:", err);
           setError(`Stop failed: ${err.message}`);
@@ -168,24 +173,133 @@ export default function Home() {
 
   // --- Effects ---
 
-  // Initial fetch and polling
+  // WebSocket Connection Effect
   useEffect(() => {
-    // --- Call the new test function on initial load ---
+    console.log("--- useEffect RUNNING ---");
+
+    // --- Attempt to prevent double-run interference ---
+    // If ws.current exists and is not closed, assume connection is active/pending
+    // This might happen if the component re-renders but the effect doesn't re-run fully
+    if (ws.current && ws.current.readyState !== WebSocket.CLOSED) {
+        console.log("useEffect: Existing WebSocket found, attaching handlers again if needed or skipping.");
+        // Potentially re-attach handlers if needed, but often just skipping is fine
+         // For now, we'll rely on the initial setup. If issues persist, revisit handler re-attachment.
+        return;
+    }
+    // --- End prevention attempt ---
+
+
+    // Fetch initial data via HTTP first
     fetchBackendTest();
     fetchStatus();
-    fetchConversation(); // Fetch initial data
+    fetchInitialConversation();
 
-    const intervalId = setInterval(() => {
-        fetchStatus();
-        if (panelStatus?.active || conversation.length === 0) {
-             fetchConversation();
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.hostname}:8000/ws`;
+    console.log(`useEffect: Attempting NEW WebSocket connection to: ${wsUrl}`);
+
+    setWsStatus("connecting");
+    // Create socket instance local to this effect run
+    const socket = new WebSocket(wsUrl);
+
+    // Immediately assign to the ref. The goal is the *second* run in Strict Mode
+    // will assign its socket here, making it the "current" one.
+    ws.current = socket;
+    console.log(`useEffect: Assigned new socket instance to ws.current`);
+
+    socket.onopen = () => {
+        console.log(`WebSocket onopen event fired (readyState: ${socket.readyState})`);
+        // Critical check: Only proceed if the ref *still* points to this instance
+        if (ws.current === socket) {
+            console.log("WebSocket connection established (onopen, ref matches)");
+            setWsStatus("open");
+            setError(null);
+        } else {
+             console.warn("WebSocket opened, but ws.current points to a different instance. Closing this orphaned socket.");
+             socket.close(); // Close the now-orphaned socket
         }
-        // Optionally re-run test periodically if needed
-        // fetchBackendTest();
-    }, 5000); // Poll every 5 seconds
+    };
 
-    return () => clearInterval(intervalId); // Cleanup interval on unmount
-  }, [panelStatus?.active]); // Re-evaluate polling needs if active status changes
+    socket.onmessage = (event) => {
+       // Check if this socket is still the one in the ref
+       if (ws.current === socket) {
+          try {
+            const message = JSON.parse(event.data);
+            console.log("WebSocket message received:", message);
+            // Handle different message types
+            switch (message.type) {
+                 case 'agent_message': setConversation((prev) => [...prev, message.payload]); break;
+                 case 'status_update': setPanelStatus(message.payload); break;
+                 case 'system_message': setConversation((prev) => [...prev, { agent: "System", address: "system", timestamp: new Date().toISOString(), ...message.payload }]); break;
+                 default: console.warn("Received unknown message type:", message.type);
+            }
+          } catch (e) {
+              console.error("Failed to parse WebSocket message or invalid format:", event.data, e);
+              setError("Received invalid message from backend.");
+          }
+       } else {
+            // console.log("WebSocket message received on non-current socket instance.");
+       }
+    };
+
+    socket.onerror = (event) => {
+        console.error(`WebSocket onerror event fired (readyState: ${socket.readyState})`);
+         // Check if this socket is still the one in the ref OR if the ref is null (meaning the intended one failed)
+        if (ws.current === socket || ws.current === null) {
+            console.error("WebSocket connection error occurred.");
+            setWsStatus("error");
+            setError("WebSocket connection error.");
+             if (ws.current === socket) ws.current = null; // Clear ref if it was this one
+        } else {
+             console.warn("WebSocket error on non-current socket instance.");
+        }
+    };
+
+    socket.onclose = (event) => {
+        console.log(`WebSocket onclose event fired (readyState: ${socket.readyState}). Code: ${event.code}`);
+        // Check if the ref points to the socket that just closed
+        if (ws.current === socket) {
+            console.log("Active WebSocket connection closed.");
+            setWsStatus("closed");
+            if (panelStatus?.active) {
+                setPanelStatus(prev => prev ? {...prev, status: "Disconnected", active: false} : null);
+            }
+            ws.current = null; // Clear the ref
+        } else {
+            console.log("Non-active WebSocket instance closed.");
+        }
+    };
+
+    // Cleanup function
+    return () => {
+      console.log("--- useEffect CLEANUP running ---");
+      // This cleanup runs for *every* execution of the effect function.
+      // In Strict Mode, it runs after the first mount, then the second mount runs,
+      // then it runs again when the component *actually* unmounts.
+
+      // Check if the ref currently points to the socket created in *this* effect run.
+      if (ws.current === socket) {
+         console.log("Cleanup: ws.current matches this effect's socket. Preparing to potentially close for UNMOUNT.");
+         // If the ref points here, it might be the actual unmount cleanup.
+         // We'll close it and clear the ref.
+         if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+             console.log(`Cleanup: Closing socket instance (readyState: ${socket.readyState}) for unmount.`);
+             socket.close();
+         }
+         ws.current = null;
+         setWsStatus("closed"); // Ensure status is reset on unmount
+      } else {
+         // If the ref points elsewhere (likely to the socket from the *second* strict mode run),
+         // then this cleanup is for the *first* strict mode run. We should close the socket
+         // local to *this* scope, but NOT clear the main ws.current ref.
+         console.log("Cleanup: ws.current does NOT match this effect's socket (Likely strict mode cleanup). Closing local socket.");
+         if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+             console.log(`Cleanup: Closing STRICT MODE socket instance (readyState: ${socket.readyState})`);
+             socket.close();
+         }
+      }
+    };
+  }, []); // Keep empty dependency array
 
   // Scroll to bottom when conversation updates
   useEffect(() => {
@@ -206,11 +320,11 @@ export default function Home() {
        bgColor = "bg-green-600";
        initials = agent.replace("AI Panel", "P").replace("AI Agent", "A"); // Example initials
     }
-    return (
+      return (
       <div className={`flex h-8 w-8 items-center justify-center rounded-full ${bgColor} text-white text-sm font-bold shrink-0`}>
         {initials}
-      </div>
-    );
+        </div>
+      );
   };
 
  // --- Render ---
@@ -232,11 +346,19 @@ export default function Home() {
                     {backendTest?.ok && <span className="text-green-400">Backend Test: OK</span>}
                     {backendTest && !backendTest.ok && <span className="text-red-400" title={`Cause: ${backendTest.cause}`}>Backend Test: FAIL</span>}
                 </div>
+                {/* --- Added: Display WebSocket Status --- */}
+                <div className="text-xs mb-1">
+                     <span className={`
+                         ${wsStatus === 'open' ? 'text-green-400' : ''}
+                         ${wsStatus === 'connecting' ? 'text-yellow-400' : ''}
+                         ${wsStatus === 'closed' || wsStatus === 'error' ? 'text-red-400' : ''}
+                     `}>WS: {wsStatus}</span>
+                </div>
                 <p className={`text-lg font-semibold ${panelStatus?.active ? 'text-green-400' : 'text-yellow-400'}`}>
                     Status: {panelStatus?.status ?? "Loading..."}
                 </p>
                 {panelStatus && <p className="text-xs text-gray-400">Agents: {panelStatus.num_agents}</p>}
-            </div>
+              </div>
 
             {/* Controls */}
              <div className="flex items-center gap-4">
@@ -267,7 +389,7 @@ export default function Home() {
                  >
                     Stop
                  </button>
-             </div>
+            </div>
           </div>
            {/* Error Display */}
            {error && (
@@ -288,29 +410,21 @@ export default function Home() {
                     className="mb-4"
                   >
                     <div className="flex items-start gap-3">
-                      <Avatar agent={msg.agent} />
+                        <Avatar agent={msg.agent} />
                       <div className="flex-1 message-bubble bg-black/20 p-3 rounded-lg min-w-0"> {/* Added min-w-0 for flexbox wrapping */}
                         <div className="text-base text-gray-100 break-words">{msg.text}</div> {/* Allow long words to break */}
                          <div className="text-xs text-gray-500 mt-1 text-right">
                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                         </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 ))}
-                 {isLoading && panelStatus?.active && conversation.length > 0 && ( // Show loading/thinking indicator only when active
-                    <div className="mb-4 flex items-start gap-3">
-                        <Avatar agent="System" />
-                        <div className="flex-1 message-bubble bg-black/20 p-3 rounded-lg italic text-gray-400">
-                            Panel is thinking...
-                        </div>
-                    </div>
-                 )}
                  {/* Anchor for scrolling */}
                  <div ref={chatEndRef} style={{ height: "1px" }} />
               </div>
             </ScrollArea>
-          </div>
+        </div>
       </div>
     </>
   );

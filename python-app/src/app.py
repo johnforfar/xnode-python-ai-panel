@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 import logging
-from aiohttp import web
+from aiohttp import web, WSMsgType
 import aiohttp_cors
 from datetime import datetime
 import json # Needed for potential JSON errors
