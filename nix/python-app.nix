@@ -33,7 +33,7 @@ python3Packages.buildPythonApplication {
       #!/bin/sh
       ${python} -m venv venv
       source venv/bin/activate
-      pip install uagents aiohttp aiohttp-cors torch torchaudio
+      pip install -r $out/bin/src/requirements.txt
       export PORT=8000
       python $out/bin/src/app.py
       EOF
