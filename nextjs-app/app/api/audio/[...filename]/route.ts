@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Define the base URL of your Python backend where audio is served
-const BACKEND_AUDIO_BASE_URL = "http://localhost:8000/audio";
+const BACKEND_AUDIO_BASE_URL = "http://127.0.0.1:8000/audio";
 
 export async function GET(
   request: NextRequest,
@@ -65,8 +65,10 @@ export async function GET(
 
   } catch (error: any) {
     console.error(`Error fetching audio from backend (${backendUrl}):`, error);
+    // Add more detail to the error response if possible
+    const cause = error.cause ? `Cause: ${error.cause.code} ${error.cause.address}:${error.cause.port}` : '';
     return NextResponse.json(
-      { error: "Internal server error proxying audio", details: error.message },
+      { error: "Internal server error proxying audio", details: error.message, cause },
       { status: 500 }
     );
   }
