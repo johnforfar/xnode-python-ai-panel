@@ -18,8 +18,7 @@ from uagents import Agent, Bureau, Context, Model
 from uagents.setup import fund_agent_if_low
 
 # --- Logging Setup (Keep as is) ---
-PROJECT_ROOT = Path(app_dir).parent.parent
-LOG_FILE = PROJECT_ROOT / "logs.txt"
+LOG_FILE = "./logs.txt"
 try:
     with open(LOG_FILE, 'w') as f: f.write("--- Log Start ---\n")
     file_handler = logging.FileHandler(LOG_FILE, mode='a')
