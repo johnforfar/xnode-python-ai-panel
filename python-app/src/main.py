@@ -48,8 +48,8 @@ logger = logging.getLogger(__name__)
 logger.info("Application logger initialized (main.py).")
 
 # --- Application Imports ---
+from generator import load_csm_1b_local # Use the local loader
 from sesame_tts import SesameTTS
-from generator import load_csm_1b_local # Assuming only local is used now
 
 # --- UAGENTS Imports (make explicit) ---
 from uagents import Agent, Bureau, Context
@@ -75,7 +75,8 @@ Conversational Style:
 - Focuses on data, logic, and first principles. Dismissive of arguments based on short-term price action or "intrinsic value" debates about physical objects.
 - Keep your responses concise and impactful, ideally 2-4 sentences. Be direct and stay laser-focused on Bitcoin's superiority.
 - Directly counter Peter Schiff's points about gold's history or Bitcoin's risks. Highlight gold's limitations in the digital world.
-""", "speaker_id": 0},
+""",
+     "speaker_id": 0},
     {"name": "Peter Schiff", "seed": "peterschiff_seed",
      "prompt": """
 You are Peter Schiff, Chief Economist of Euro Pacific Capital and a staunch advocate for gold as the only true money and store of value. You are highly critical of fiat currency, central banking (especially the Federal Reserve), and speculative assets like Bitcoin.
@@ -96,7 +97,8 @@ Conversational Style:
 - Often predicts economic doom due to fiat currency debasement but sees gold as the only safe haven, not Bitcoin.
 - Keep your responses concise and biting, ideally 2-4 sentences. Directly challenge Saylor's claims.
 - Question the "digital energy" narrative and highlight Bitcoin's practical limitations and risks compared to gold.
-""", "speaker_id": 1},
+""",
+     "speaker_id": 4},
 ]
 
 # --- UAGENTS Definitions ---
@@ -182,36 +184,41 @@ class PanelManager:
         self.bureau = None
 
         # --- Initialize TTS using LOCAL loader ---
-        # Now torch is imported and can be used here
         self.tts_device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Attempting to initialize SesameTTS on device: {self.tts_device}")
+        logger.info(f"Attempting to initialize SesameTTS class on device: {self.tts_device}")
 
         # --- Define the path to your LOCAL model directory ---
         local_model_base_path = Path(app_dir).parent.parent / "models"
-        local_model_path = local_model_base_path # Pass the base /models path
 
-        logger.info(f"Attempting to load LOCAL model from: {local_model_path}")
         try:
-            # --- CALL load_csm_1b_local ---
-            self.tts_generator = load_csm_1b_local(model_path=str(local_model_path), device=self.tts_device)
+             # --- Instantiate SesameTTS (which now internally calls load_csm_1b_local) ---
+             logger.info(f"Instantiating SesameTTS, targeting model path: {local_model_base_path} and device: {self.tts_device}")
+             # Pass device string and model base path
+             self.tts = SesameTTS(device=self.tts_device, model_dir=str(local_model_base_path))
 
-            # --- Directly use the generator ---
-            self.tts = self.tts_generator
-            self.sample_rate = self.tts.sample_rate
-            self.tts_available = True
-            logger.info(f"SesameTTS initialized successfully using LOCAL model. Sample Rate: {self.sample_rate}")
+             # Check if TTS loaded successfully within the class
+             if self.tts.tts_available:
+                  self.tts_generator = self.tts.generator # Get the generator instance if needed elsewhere
+                  self.sample_rate = self.tts.sample_rate
+                  self.tts_available = True
+                  logger.info(f"SesameTTS wrapper initialized successfully. Sample Rate: {self.sample_rate}")
+             else:
+                  logger.error("SesameTTS wrapper indicated TTS failed to load.")
+                  self.tts = None # Ensure tts is None if it failed
+                  self.tts_generator = None
+                  self.tts_available = False
 
-        except FileNotFoundError as e:
-             logger.error(f"LOCAL model directory/files not found at {local_model_path}: {e}", exc_info=True)
-             self.tts = None
-             self.tts_available = False
         except Exception as e:
-            logger.error(f"Failed to initialize SesameTTS from LOCAL model: {str(e)}", exc_info=True)
+            logger.error(f"Failed to instantiate SesameTTS wrapper: {str(e)}", exc_info=True)
             self.tts = None
+            self.tts_generator = None
             self.tts_available = False
+        # --- End TTS Initialization ---
 
+        # --- Agent Speaker Map (Uses updated AGENTS list) ---
         self.agent_speaker_map = {agent["name"]: agent.get("speaker_id", 0) for agent in AGENTS}
         logger.info(f"Agent Speaker ID Map: {self.agent_speaker_map}")
+        # --- End Speaker Map ---
 
         # --- ADD Conversation Counter ---
         self.message_counter = 0
@@ -405,35 +412,46 @@ class PanelManager:
              logger.info(f"Reached message limit ({self.max_messages}). Stopping panel automatically.")
              asyncio.create_task(self.stop_panel())
 
-    # --- NEW METHOD: Generate and Broadcast Audio ---
+    # --- Generate and Broadcast Audio ---
+    # This method now calls the self.tts object's method
     async def generate_and_broadcast_audio(self, message_payload: dict):
         """Generates audio for a message and broadcasts the update."""
         agent_name = message_payload["agent"]
         text = message_payload["text"]
         timestamp = message_payload["timestamp"]
 
-        if not self.tts_available:
+        # Use the check within the self.tts instance now
+        if not self.tts or not self.tts.tts_available:
             logger.warning(f"TTS not available, skipping audio for {timestamp}.")
             update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
             await self.broadcast_message({"type": "audio_update", "payload": update_payload})
             return
 
-        speaker_id = self.agent_speaker_map.get(agent_name, 0) # Get speaker ID from map, default 0
-        logger.info(f"Generating audio for msg [{timestamp}], speaker {speaker_id}...")
+        speaker_id = self.agent_speaker_map.get(agent_name, 0) # Get speaker ID from map
+        logger.info(f"Generating audio via SesameTTS wrapper for msg [{timestamp}], speaker {speaker_id}...")
 
-        mp3_filepath = await self.tts.generate_audio_and_convert(text, speaker_id)
+        # Call the method on the self.tts instance
+        # Ensure the output directory is correct ('static/audio')
+        mp3_filepath_str = await self.tts.generate_audio_and_convert(
+            text,
+            speaker_id,
+            output_dir="static/audio" # Explicitly set output dir relative to src/
+        )
 
-        if mp3_filepath:
+        if mp3_filepath_str:
+            mp3_filepath = Path(mp3_filepath_str)
             # Convert absolute filepath to relative URL path for frontend
             try:
-                # Assuming 'static' is the base directory served
-                relative_path = os.path.relpath(mp3_filepath, 'static')
-                # Ensure forward slashes for URL
-                audio_url = "/" + relative_path.replace("\\", "/")
+                # --- Create URL relative to the static serving directory ---
+                static_dir = Path(app_dir) / "static" # Base static dir
+                relative_path = mp3_filepath.relative_to(static_dir)
+                # Ensure forward slashes for URL, add leading slash
+                audio_url = "/" + relative_path.as_posix()
+                # --- End URL Creation ---
                 logger.info(f"Audio generated successfully for [{timestamp}]: {audio_url}")
                 update_payload = {"timestamp": timestamp, "audioStatus": "ready", "audioUrl": audio_url}
             except ValueError as e:
-                 logger.error(f"Failed to create relative path for {mp3_filepath} relative to 'static': {e}. Sending failed status.")
+                 logger.error(f"Failed to create relative path for {mp3_filepath} relative to {static_dir}: {e}. Sending failed status.")
                  update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
         else:
             logger.error(f"Audio generation failed for msg [{timestamp}]")
@@ -441,7 +459,7 @@ class PanelManager:
 
         logger.info(f"Broadcasting audio update for msg [{timestamp}]: {update_payload}")
         await self.broadcast_message({"type": "audio_update", "payload": update_payload})
-    # --- End NEW METHOD ---
+    # --- End Generate Audio ---
 
     async def start_panel(self, num_agents_req: int):
         """Starts the uAgents Bureau and conversation."""

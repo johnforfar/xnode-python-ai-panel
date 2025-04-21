@@ -230,50 +230,77 @@ export default function Home() {
     // If you want to clear backend history, you'd need a backend API call here.
   };
 
-  // --- NEW: Play Audio Handler ---
+  // --- Modified: Play Audio Handler ---
   const handlePlay = (timestamp: string, url: string | null | undefined) => {
     if (!url || !audioRef.current) {
       console.warn("Cannot play audio: No URL or audio element ref.");
       return;
     }
 
-    console.log(`Playing audio for ${timestamp}: ${url}`);
+    // --- FIX: Construct the URL pointing to the Next.js proxy API route ---
+    // The 'url' from backend is like "/audio/audio_spk0_....mp3"
+    // We need to request "/api/audio/audio_spk0_....mp3" from our Next.js app
+    const proxyAudioUrl = url.startsWith("/audio/")
+      ? `/api${url}` // Prepend /api to the existing relative URL
+      : url; // If it's already a full URL somehow, use it (fallback)
 
-    // Stop any currently playing audio and reset its status in conversation state
+    // Ensure it starts with a slash if it became relative
+    const finalAudioUrl = proxyAudioUrl.startsWith("/") ? proxyAudioUrl : `/${proxyAudioUrl}`;
+     // --- End FIX ---
+
+    console.log(`Playing audio for ${timestamp} via proxy: ${finalAudioUrl}`); // Log the proxy URL
+
+    // Stop any currently playing audio and reset its status
     if (!audioRef.current.paused) {
-       audioRef.current.pause();
-       // Find the message that *was* playing and reset its status
-       setConversation(prev => prev.map(m =>
-           m.audioStatus === 'playing' ? { ...m, audioStatus: 'ready' } : m
-       ));
+      audioRef.current.pause();
+      setConversation((prev) =>
+        prev.map((m) =>
+          m.audioStatus === "playing" ? { ...m, audioStatus: "ready" } : m
+        )
+      );
     }
-     audioRef.current.currentTime = 0; // Reset time
+    audioRef.current.currentTime = 0;
 
     // Update the status of the message we are about to play
-    setConversation(prev => prev.map(m =>
-        m.timestamp === timestamp ? { ...m, audioStatus: 'playing' } : m
-    ));
+    setConversation((prev) =>
+      prev.map((m) =>
+        m.timestamp === timestamp ? { ...m, audioStatus: "playing" } : m
+      )
+    );
 
-    // Set the source and play
-    audioRef.current.src = url;
-    audioRef.current.play().catch(e => {
-       console.error("Audio play failed:", e);
-       // Set status to failed if play() promise rejects
-       setConversation(prev => prev.map(m => m.timestamp === timestamp ? { ...m, audioStatus: 'failed' } : m));
-    });
+    // Set the source to the PROXY URL and play
+    audioRef.current.src = finalAudioUrl; // Use the corrected proxy URL
+    audioRef.current
+      .play()
+      .catch((e) => {
+        console.error("Audio play failed:", e);
+        setConversation((prev) =>
+          prev.map((m) =>
+            m.timestamp === timestamp ? { ...m, audioStatus: "failed" } : m
+          )
+        );
+      });
 
-    // --- Add listeners within the handlePlay function ---
-    const currentAudioElement = audioRef.current; // Capture ref value
+    // --- Add listeners (unchanged logic, but logs will show proxy URL on error) ---
+    const currentAudioElement = audioRef.current;
 
     const onEnded = () => {
-       console.log(`Audio ended for ${timestamp}`);
-       setConversation(prev => prev.map(m => m.timestamp === timestamp ? { ...m, audioStatus: 'ready' } : m));
-       cleanupListeners(); // Remove listeners after use
+      console.log(`Audio ended for ${timestamp}`);
+      setConversation((prev) =>
+        prev.map((m) =>
+          m.timestamp === timestamp ? { ...m, audioStatus: "ready" } : m
+        )
+      );
+      cleanupListeners();
     };
     const onError = () => {
-       console.error(`Audio error for ${timestamp}: ${url}`);
-       setConversation(prev => prev.map(m => m.timestamp === timestamp ? { ...m, audioStatus: 'failed' } : m));
-       cleanupListeners(); // Remove listeners after use
+      console.error(`Audio error for ${timestamp}: ${finalAudioUrl}`); // Log proxy URL on error
+      setConversation((prev) =>
+        prev.map((m) =>
+          m.timestamp === timestamp ? { ...m, audioStatus: "failed" } : m
+        )
+      );
+      cleanupListeners();
     };
 
      const cleanupListeners = () => {
@@ -282,15 +309,14 @@ export default function Home() {
      };
 
     // Clear previous listeners before adding new ones
-    // This is important because we reuse the audio element
-     currentAudioElement?.removeEventListener('ended', onEnded); // Might need to store previous listeners if complex
-     currentAudioElement?.removeEventListener('error', onError); // Might need to store previous listeners if complex
+     currentAudioElement?.removeEventListener('ended', onEnded);
+     currentAudioElement?.removeEventListener('error', onError);
 
     currentAudioElement?.addEventListener('ended', onEnded);
     currentAudioElement?.addEventListener('error', onError);
     // --- End Listeners ---
   };
-  // --- End Play Audio Handler ---
+  // --- End Play Audio Handler Modification ---
 
   // --- Effects ---
 
