@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import logging
 from safetensors.torch import load_file as load_safetensors_file
+import pickle
 
 # Ensure torchtune is installed: pip install torchtune
 try:
@@ -86,6 +87,25 @@ def _create_causal_mask(seq_len: int, device: torch.device):
     # Creates a lower triangular mask for causal attention.
     return torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool, device=device))
 
+def _index_causal_mask(mask: torch.Tensor, input_pos: torch.Tensor):
+    """
+    Indexes a square causal mask using a tensor of indices.
+    Args:
+        mask: (max_seq_len, max_seq_len)
+        input_pos: (batch_size, seq_len)
+    Returns:
+        (batch_size, seq_len, max_seq_len)
+    """
+    # Add logging if needed for debugging mask shapes/indices
+    # logger.debug(f"Indexing mask {mask.shape} with indices {input_pos.shape}")
+    try:
+        r = mask[input_pos, :]
+        return r
+    except IndexError as e:
+         # logger.error(f"IndexError in _index_causal_mask: {e}", exc_info=True)
+         # logger.error(f"Max index: {input_pos.max().item()}, Mask dim: {mask.shape[0]}")
+         raise
+
 def _multinomial_sample_one_no_sync(probs):
     # Efficient multinomial sampling.
     q = torch.empty_like(probs).exponential_(1)
@@ -162,34 +182,6 @@ class Model(*BaseModelClass):
         # nn.init.kaiming_uniform_(self.audio_head, a=math.sqrt(5))
         logger.info("Model components initialized (KV Caching ENABLED).")
 
-    # --- RESTORE _index_causal_mask from OLD version ---
-    def _index_causal_mask(mask: torch.Tensor, input_pos: torch.Tensor):
-        """
-        Indexes a square causal mask using a tensor of indices.
-        Args:
-            mask: (max_seq_len, max_seq_len)
-            input_pos: (batch_size, seq_len)
-        Returns:
-            (batch_size, seq_len, max_seq_len)
-        """
-        logger.debug(f"--- _index_causal_mask (Old Version) ---")
-        logger.debug(f"  Input mask shape: {mask.shape}")
-        logger.debug(f"  Input indices (input_pos) shape: {input_pos.shape}")
-        try:
-            # Select rows based on input_pos
-            r = mask[input_pos, :]
-            logger.debug(f"  Output mask shape: {r.shape}")
-            return r
-        except IndexError as e:
-            logger.error(f"  IndexError in _index_causal_mask: {e}", exc_info=True)
-            logger.error(f"  Max index requested: {input_pos.max().item() if input_pos.numel() > 0 else 'N/A'}")
-            logger.error(f"  Mask dimension size: {mask.shape[0]}")
-            raise
-        except Exception as e:
-            logger.error(f"  Unexpected error in _index_causal_mask: {e}", exc_info=True)
-            raise
-    # --- End Restore ---
-
     def setup_caches(self, max_batch_size: int, dtype: torch.dtype) -> None:
         """Setup KV caches."""
         device = next(self.parameters()).device
@@ -243,121 +235,100 @@ class Model(*BaseModelClass):
         self,
         tokens: torch.Tensor,
         tokens_mask: torch.Tensor,
-        input_pos: torch.Tensor, # Initial input_pos for the backbone
+        input_pos: torch.Tensor, # Global input_pos for the backbone
         temperature: float,
         topk: int,
     ) -> torch.Tensor:
         """Generates one frame of audio tokens (KV Caching ENABLED)."""
-        # --- Start of Changes ---
-        # MODIFY Assertions to check property instead of calling method
-        # Default to False if the attribute doesn't exist
+        # Based on ORIGINAL Sesame models.py logic
         backbone_caches_enabled = getattr(self.backbone, 'caches_are_enabled', False)
         decoder_caches_enabled = getattr(self.decoder, 'caches_are_enabled', False)
 
         if not backbone_caches_enabled:
-             self.logger.error("Assertion failed: Backbone caches property 'caches_are_enabled' is False or missing!")
-             # Log relevant attributes of self.backbone to help debug
-             self.logger.error(f"Backbone attributes: {dir(self.backbone)}")
+             self.logger.error("Assertion failed: Backbone caches not enabled!")
              raise AssertionError("Backbone caches are not enabled. Call setup_caches first.")
         if not decoder_caches_enabled:
-             self.logger.error("Assertion failed: Decoder caches property 'caches_are_enabled' is False or missing!")
-             # Log relevant attributes of self.decoder
-             self.logger.error(f"Decoder attributes: {dir(self.decoder)}")
+             self.logger.error("Assertion failed: Decoder caches not enabled!")
              raise AssertionError("Decoder caches are not enabled. Call setup_caches first.")
-        self.logger.debug("Assertions passed: Cache properties 'caches_are_enabled' are True.")
-        # --- End of Changes ---
+        # self.logger.debug("Assertions passed: Caches enabled.") # Optional
 
         dtype = next(self.parameters()).dtype
         device = next(self.parameters()).device
 
-        # --- Backbone Section (Keep restored logic) ---
+        # --- Backbone Section (As before) ---
         embeds = self._embed_tokens(tokens)
         masked_embeds = embeds * tokens_mask.unsqueeze(-1)
         h = masked_embeds.sum(dim=2)
-        self.logger.debug(f"--- Backbone Call (Cache Enabled) ---")
-        self.logger.debug(f"  Input h shape: {h.shape}")
-        self.logger.debug(f"  Input input_pos shape: {input_pos.shape}, values:\n{input_pos}")
-
+        # self.logger.debug(f"--- Backbone Call ---")
         try:
-            # Calculate mask using the OLD restored _index_causal_mask
-            curr_backbone_mask = self._index_causal_mask(self.backbone_causal_mask, input_pos)
-            self.logger.debug(f"  Calculated curr_backbone_mask shape: {curr_backbone_mask.shape}")
-        except Exception as e:
-            self.logger.error(f"Error indexing backbone causal mask: {e}", exc_info=True)
-            raise ValueError(f"Failed to create backbone mask: {e}") from e
-
-        try:
-            # Call backbone WITH input_pos and the calculated mask
+            curr_backbone_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
             backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask)
-            self.logger.debug(f"  Backbone output shape: {backbone_output.shape}")
-            h = backbone_output.to(dtype=dtype)
+            h = backbone_output # Use output directly (CPU float32 fix)
         except Exception as e:
-             self.logger.error(f"--- ERROR during self.backbone call (Cache Enabled) ---")
-             self.logger.error(f"  Exception: {e}", exc_info=False)
-             self.logger.error(f"  Input h shape: {h.shape}")
-             self.logger.error(f"  Input input_pos shape: {input_pos.shape}")
-             self.logger.error(f"  Input curr_backbone_mask shape: {curr_backbone_mask.shape if curr_backbone_mask is not None else 'None'}")
+             self.logger.error(f"--- ERROR during self.backbone call ---", exc_info=True)
              raise
         # --- End Backbone Section ---
 
-        # --- Decoder Section (Keep restored logic) ---
+        # --- Decoder Section (Reverted to Original Sesame Logic) ---
         last_h = h[:, -1, :]
         c0_logits = self.codebook0_head(last_h)
         c0_sample = sample_topk(c0_logits, topk, temperature)
         c0_embed = self._embed_audio(0, c0_sample)
-        curr_h = torch.cat([last_h.unsqueeze(1), c0_embed], dim=1)
-        curr_sample = c0_sample.clone()
-        curr_pos = torch.arange(0, curr_h.size(1), device=curr_h.device).unsqueeze(0).repeat(curr_h.size(0), 1)
 
-        # Check if decoder_causal_mask exists (important after restoring setup_caches)
+        curr_h = torch.cat([last_h.unsqueeze(1), c0_embed], dim=1) # Input for first decoder step
+        curr_sample = c0_sample.clone() # Stores generated codebook tokens
+        # Position tracker for the decoder input sequence (starts at 0, grows)
+        curr_pos_decoder = torch.arange(0, curr_h.size(1), device=curr_h.device).unsqueeze(0).repeat(curr_h.size(0), 1)
+
         if not hasattr(self, 'decoder_causal_mask'):
-             self.logger.error("self.decoder_causal_mask not found after setup_caches!")
+             self.logger.error("self.decoder_causal_mask not found!")
              raise AttributeError("Model is missing 'decoder_causal_mask', cannot generate.")
 
-        # Decoder loop
+        # Decoder loop: i goes from 1 to 31 (predicting codebooks 1 to 31)
+        # --- REVERT decoder loop logic to match original ---
+        if hasattr(self.decoder, 'reset_caches'): # Reset cache before the loop
+             self.decoder.reset_caches()
+        else:
+             self.logger.warning("Decoder has no reset_caches method!")
+
         for i in range(1, self.config.audio_num_codebooks):
+            # Reset cache *inside* the loop (as per original models.py)
+            # This seems necessary for the original non-streaming logic to work with the cache
+            # if hasattr(self.decoder, 'reset_caches'):
+            #    self.decoder.reset_caches() # Keep reset inside loop as per original
+
             try:
-                # --- ADD Decoder Cache Reset (from old version) ---
-                if hasattr(self.decoder, 'reset_caches'):
-                    self.decoder.reset_caches()
-                # --- End Add ---
+                # Project the current hidden state (curr_h)
+                projected_input = self.projection(curr_h) # Input for decoder
+                # Index the mask using the current decoder position tracker
+                curr_decoder_mask = _index_causal_mask(self.decoder_causal_mask, curr_pos_decoder)
 
-                decoder_input = self.projection(curr_h)
-                try:
-                    # Calculate mask using the OLD restored _index_causal_mask
-                    curr_decoder_mask = self._index_causal_mask(self.decoder_causal_mask, curr_pos)
-                except Exception as e:
-                    self.logger.error(f"Error indexing decoder causal mask at step {i}: {e}", exc_info=True)
-                    raise ValueError(f"Failed to create decoder mask at step {i}: {e}") from e
+                # self.logger.debug(f"--- Decoder Step {i} ---")
+                # self.logger.debug(f"  Input projected_input shape: {projected_input.shape}")
+                # self.logger.debug(f"  Input curr_pos_decoder shape: {curr_pos_decoder.shape}, values:\n{curr_pos_decoder}")
+                # self.logger.debug(f"  Calculated curr_decoder_mask shape: {curr_decoder_mask.shape}")
 
-                self.logger.debug(f"--- Decoder Step {i} (Cache Enabled) ---")
-                self.logger.debug(f"  Input decoder_input shape: {decoder_input.shape}")
-                self.logger.debug(f"  Input curr_pos shape: {curr_pos.shape}, values:\n{curr_pos}")
-                self.logger.debug(f"  Calculated curr_decoder_mask shape: {curr_decoder_mask.shape}")
-
-                # Call decoder WITH input_pos and the calculated mask
-                decoder_output = self.decoder(decoder_input, input_pos=curr_pos, mask=curr_decoder_mask)
-
-                decoder_h = decoder_output.to(dtype=dtype)
-                self.logger.debug(f"  Output decoder_h shape: {decoder_h.shape}")
+                # Call decoder with the projected input, its positions, and mask
+                decoder_output = self.decoder(projected_input, input_pos=curr_pos_decoder, mask=curr_decoder_mask)
+                decoder_h = decoder_output # Use output directly (CPU float32 fix)
 
             except Exception as e:
-                self.logger.error(f"--- ERROR during self.decoder call at step {i} (Cache Enabled) ---")
-                self.logger.error(f"  Exception: {e}", exc_info=False)
-                self.logger.error(f"  Input decoder_input shape: {decoder_input.shape}")
-                self.logger.error(f"  Input curr_pos shape: {curr_pos.shape}, values:\n{curr_pos}")
-                self.logger.error(f"  Input curr_decoder_mask shape: {curr_decoder_mask.shape if curr_decoder_mask is not None else 'None'}")
+                self.logger.error(f"--- ERROR during self.decoder call at step {i} ---", exc_info=True)
                 raise
 
+            # Sample the next codebook token (ci)
             ci_logits = torch.mm(decoder_h[:, -1, :], self.audio_head[i - 1])
             ci_sample = sample_topk(ci_logits, topk, temperature)
             ci_embed = self._embed_audio(i, ci_sample)
-            curr_h = ci_embed
+
+            # Update state for the *next* iteration:
+            curr_h = ci_embed # Input for next step is the embedding of the token just generated
             curr_sample = torch.cat([curr_sample, ci_sample], dim=1)
-            curr_pos = curr_pos[:, -1:] + 1
+            curr_pos_decoder = curr_pos_decoder[:, -1:] + 1 # Increment decoder position tracker
+        # --- End Revert ---
         # --- End Decoder Section ---
 
-        return curr_sample
+        return curr_sample # Shape [B, 32]
 
     # --- Embedding helpers (as provided) ---
     def _embed_audio(self, codebook: int, tokens: torch.Tensor) -> torch.Tensor:
@@ -389,7 +360,7 @@ class Model(*BaseModelClass):
         return torch.cat([audio_embeds, text_embeds], dim=2) # Result shape: (b, s, cb+1, dim)
 
     @classmethod
-    def from_local_pretrained(cls, local_path: str, device: str = 'cpu'):
+    def from_local_pretrained(cls, local_path: str):
         """Loads the model configuration and weights from a local directory."""
         local_path = Path(local_path)
         logger.info(f"Loading model from local path: {local_path}")
@@ -401,8 +372,8 @@ class Model(*BaseModelClass):
         # 2. Initialize model (keep as is)
         model = cls(config)
 
-        # 3. Load the state dictionary (weights) - **MODIFIED**
-        potential_weight_files = ["model.safetensors", "pytorch_model.bin", "csm_weights.pt", "csm-1b.pt"] # Prioritize safetensors
+        # 3. Load the state dictionary (weights)
+        potential_weight_files = ["model.safetensors", "pytorch_model.bin", "csm_weights.pt", "csm-1b.pt"]
         weight_file_path = None
         weight_file_type = None
 
@@ -422,28 +393,28 @@ class Model(*BaseModelClass):
 
         logger.info(f"Loading weights from {weight_file_path} using {weight_file_type} loader...")
 
-        # --- Load based on file type ---
+        # Determine map_location for torch.load (use 'cpu' by default for initial load)
+        # Loading directly to CUDA can sometimes cause issues if tensors were saved from CPU
+        map_location_device = 'cpu' # Load to CPU first for stability
+        logger.debug(f"Using map_location='{map_location_device}' for torch.load")
+
         if weight_file_type == "safetensors":
-            # Use safetensors loader
             try:
-                 # load_safetensors_file loads directly to the specified device
-                 state_dict = load_safetensors_file(weight_file_path, device=device)
-                 logger.info(f"Safetensors file loaded successfully to device '{device}'.")
+                 # load_safetensors_file loads directly to the specified device. Let's try CPU first.
+                 state_dict = load_safetensors_file(weight_file_path, device=map_location_device)
+                 logger.info(f"Safetensors file loaded successfully to device '{map_location_device}'.")
             except Exception as e:
                  logger.error(f"Failed to load safetensors file {weight_file_path}: {e}", exc_info=True)
                  raise
-        else: # Assume PyTorch format (.bin, .pt)
+        else: # PyTorch format
             try:
-                 # Use torch.load with weights_only=True for security if possible
-                 # map_location ensures loading onto the target device
-                 state_dict = torch.load(weight_file_path, map_location=torch.device(device), weights_only=True)
-                 logger.info(f"PyTorch file loaded successfully with weights_only=True to device '{device}'.")
-            except (_pickle.UnpicklingError, RuntimeError, EOFError) as load_err:
-                 # Fallback for older files or potential corruption, without weights_only
+                 state_dict = torch.load(weight_file_path, map_location=map_location_device, weights_only=True)
+                 logger.info(f"PyTorch file loaded successfully with weights_only=True to device '{map_location_device}'.")
+            except (pickle.UnpicklingError, RuntimeError, EOFError) as load_err:
                  logger.warning(f"torch.load with weights_only=True failed ({load_err}). Retrying with weights_only=False (potential security risk).")
                  try:
-                     state_dict = torch.load(weight_file_path, map_location=torch.device(device), weights_only=False) # Potential security risk
-                     logger.info(f"PyTorch file loaded successfully with weights_only=False to device '{device}'.")
+                     state_dict = torch.load(weight_file_path, map_location=map_location_device, weights_only=False)
+                     logger.info(f"PyTorch file loaded successfully with weights_only=False to device '{map_location_device}'.")
                  except Exception as e:
                      logger.error(f"Failed to load PyTorch file {weight_file_path} even with weights_only=False: {e}", exc_info=True)
                      raise
@@ -451,14 +422,12 @@ class Model(*BaseModelClass):
                  logger.error(f"Failed to load PyTorch file {weight_file_path}: {e}", exc_info=True)
                  raise
 
-
-        # 4. Load state dict into model
+        # 4. Load state dict into model (model is currently on CPU)
         logger.info("Loading state dict into model...")
         try:
              load_result = model.load_state_dict(state_dict, strict=True)
              logger.info(f"State dict loaded successfully (strict=True). Result: {load_result}")
         except RuntimeError as e:
-             # Log only the summary error from strict loading
              logger.error(f"Error loading state dict (strict=True): Mismatched keys found. Details: {str(e)[:500]}...")
              logger.info("Attempting to load state dict with strict=False...")
              try:
@@ -472,7 +441,6 @@ class Model(*BaseModelClass):
              logger.error(f"An unexpected error occurred during state dict loading: {e_other}", exc_info=True)
              raise
 
-        model.to(device)
         model.eval()
-        logger.info(f"Model ready on device '{device}' and set to eval mode.")
+        logger.info(f"Model loaded to CPU and set to eval mode. Device transfer happens after.")
         return model
