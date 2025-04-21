@@ -31,7 +31,7 @@ python3Packages.buildPythonApplication {
       #!/bin/sh
       ${python} -m venv venv
       source venv/bin/activate
-      pip install aiohttp aiohttp-cors
+      pip install uagents aiohttp aiohttp-cors
       export PORT=8000
       python $out/bin/src/app.py
       EOF
