@@ -1,8 +1,3 @@
-import os
-app_dir = os.path.dirname(__file__)
-os.chdir(app_dir)
-print(f"INFO: Changed working directory to: {os.getcwd()}")
-
 import logging
 import logging.handlers
 from pathlib import Path
