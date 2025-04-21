@@ -171,6 +171,14 @@ export default function Home() {
   };
   // --- End of new function ---
 
+  // --- Add handleClear function ---
+  const handleClear = () => {
+    console.log("Clearing frontend conversation history.");
+    setConversation([]); // Reset the conversation state to an empty array
+    // Note: This only clears the frontend view.
+    // If you want to clear backend history, you'd need a backend API call here.
+  };
+
   // --- Effects ---
 
   // WebSocket Connection Effect
@@ -185,7 +193,7 @@ export default function Home() {
         // Potentially re-attach handlers if needed, but often just skipping is fine
          // For now, we'll rely on the initial setup. If issues persist, revisit handler re-attachment.
         return;
-    }
+      }
     // --- End prevention attempt ---
 
 
@@ -214,7 +222,7 @@ export default function Home() {
             console.log("WebSocket connection established (onopen, ref matches)");
             setWsStatus("open");
             setError(null);
-        } else {
+          } else {
              console.warn("WebSocket opened, but ws.current points to a different instance. Closing this orphaned socket.");
              socket.close(); // Close the now-orphaned socket
         }
@@ -388,6 +396,13 @@ export default function Home() {
                      className="px-4 py-2 bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                  >
                     Stop
+                 </button>
+                 <button
+                     onClick={handleClear}
+                     disabled={conversation.length === 0} // Disable if already empty
+                     className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                    Clear
                  </button>
             </div>
           </div>

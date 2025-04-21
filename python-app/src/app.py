@@ -2,42 +2,37 @@ import os
 import sys
 import asyncio
 import logging
-from aiohttp import web, WSMsgType
+from aiohttp import web
 import aiohttp_cors
 from datetime import datetime
-import json # Needed for potential JSON errors
-from main import AGENTS, panel_manager, websocket_handler # lowercase 'p', lowercase 'm'
+import json
 
-# --- Logging Setup (Keep as is) ---
+# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
 logger = logging.getLogger(__name__)
 logger.info("--- app.py: Script Start ---")
 
-# --- Import PanelManager INSTANCE and AGENTS from main.py ---
+# --- Import PanelManager INSTANCE, AGENTS list, and websocket_handler from main.py ---
 try:
-    # Import the instance directly
-    from main import AGENTS, panel_manager, websocket_handler # Import the websocket handler too
-    logger.info("Successfully imported AGENTS and panel_manager instance from main.py")
+    from main import AGENTS, panel_manager, websocket_handler # Import necessary items
+    logger.info("Successfully imported AGENTS, panel_manager instance, and websocket_handler from main.py")
 except ImportError as e:
-    logger.critical(f"Could not import AGENTS or panel_manager from main.py. Ensure main.py exists and defines them. {e}", exc_info=True)
-    # Cannot continue without panel_manager
+    logger.critical(f"Could not import from main.py. {e}", exc_info=True)
     sys.exit(1)
 except Exception as e:
     logger.critical(f"An unexpected error occurred during import from main.py: {e}", exc_info=True)
     sys.exit(1)
 
 
-# --- API Handlers (Now use the imported panel_manager instance) ---
+# --- API Handlers (Use imported panel_manager instance) ---
 
 async def handle_test(request):
-    # This handler doesn't need the manager
     logger.info("Test endpoint /api/test called successfully.")
     return web.json_response({"status": "ok", "message": "Test successful!"})
 
 async def get_status(request):
     logger.info("GET /api/status")
     try:
-        # Use the imported panel_manager instance
         status_data = panel_manager.get_status_data()
         return web.json_response(status_data)
     except Exception as e:
@@ -47,7 +42,6 @@ async def get_status(request):
 async def get_conversation(request):
     logger.info("GET /api/conversation")
     try:
-        # Use the imported panel_manager instance
         conv_data = panel_manager.get_conversation_data()
         logger.info(f"Returning {len(conv_data['history'])} messages")
         return web.json_response(conv_data)
@@ -60,11 +54,10 @@ async def handle_start(request):
     logger.info("POST /api/start")
     num_agents = 2 # Default
     try:
-        # Check if request has body and content type is json before parsing
         if request.can_read_body and request.content_type == 'application/json':
             data = await request.json()
             num_agents_req = data.get('numAgents', 2)
-            # Use the length of AGENTS imported from main
+            # Use len(AGENTS) imported from main
             if not isinstance(num_agents_req, int) or not 1 <= num_agents_req <= len(AGENTS):
                  logger.error(f"Invalid numAgents received: {num_agents_req}")
                  return web.json_response({"error": f"Invalid 'numAgents' (must be 1-{len(AGENTS)})"}, status=400)
@@ -72,10 +65,10 @@ async def handle_start(request):
         else:
              logger.info("No valid JSON body for start, using default agents.")
 
-        # Use the imported panel_manager instance
+        # Call panel_manager method (which now starts the Bureau)
         success = await panel_manager.start_panel(num_agents)
         if success:
-            return web.json_response({"status": "Panel started"})
+            return web.json_response({"status": "Panel starting (uAgents Bureau)"})
         else:
             # If start_panel returns False, it means it was already running
             return web.json_response({"status": "Already running"}, status=400) # Return 400 Bad Request
@@ -90,10 +83,10 @@ async def handle_start(request):
 async def handle_stop(request):
     logger.info("POST /api/stop")
     try:
-        # Use the imported panel_manager instance
+        # Call panel_manager method (which now stops the Bureau)
         success = await panel_manager.stop_panel()
         if success:
-            return web.json_response({"status": "Panel stopped"})
+            return web.json_response({"status": "Panel stopping"})
         else:
             # If stop_panel returns False, it means it was already stopped
             return web.json_response({"status": "Already stopped"}, status=400) # Return 400 Bad Request
@@ -105,7 +98,6 @@ async def handle_stop(request):
 # --- Application Setup Function ---
 def setup_routes(app):
     logger.info("Setting up routes...")
-    # Use aiohttp_cors for setup
     cors = aiohttp_cors.setup(app, defaults={
         # Allow the default Next.js port and potentially others
         "*": aiohttp_cors.ResourceOptions( # Changed to wildcard for simplicity, restrict as needed
@@ -126,8 +118,8 @@ def setup_routes(app):
     add_route("/api/start", handle_start, method='POST')
     add_route("/api/stop", handle_stop, method='POST')
 
-    # Add WebSocket Route (using the handler imported from main.py)
-    add_route("/ws", websocket_handler) # Add route for WebSocket
+    # Add WebSocket Route using the handler IMPORTED from main.py
+    add_route("/ws", websocket_handler)
 
     logger.info("Routes setup complete.")
 
