@@ -70,6 +70,9 @@ in
         "ollama.service"
         #"postgresql.service"
       ];
+      path = [
+        pkgs.git
+      ];
       environment = {
         PORT = toString 8000;
         #  DB_HOST = "localhost";
