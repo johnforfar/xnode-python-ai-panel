@@ -18,6 +18,8 @@ python3Packages.buildPythonApplication {
     setuptools
   ];
 
+  buildInputs = [ pkgs.stdenv.cc.cc.lib ];
+
   buildPhase =
     let
       python = lib.getExe pkgs.python3;

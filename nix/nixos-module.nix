@@ -72,12 +72,13 @@ in
       ];
       environment = {
         PORT = toString 8000;
-      #  DB_HOST = "localhost";
-      #  DB_PORT = toString config.services.postgresql.settings.port;
-      #  DB_NAME = "game";
-      #  DB_USER = "game";
-      #  DB_PASS = "game";
+        #  DB_HOST = "localhost";
+        #  DB_PORT = toString config.services.postgresql.settings.port;
+        #  DB_NAME = "game";
+        #  DB_USER = "game";
+        #  DB_PASS = "game";
         SECRET = cfg.secret;
+        LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
       };
       serviceConfig = {
         ExecStart = "${lib.getExe xnode-python-ai-panel-backend}";
