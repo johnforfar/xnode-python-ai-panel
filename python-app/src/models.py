@@ -190,61 +190,46 @@ class Model(*BaseModelClass):
             raise
     # --- End Restore ---
 
-    def setup_caches(self, max_batch_size: int) -> None:
-        """Setup KV caches and causal masks."""
+    def setup_caches(self, max_batch_size: int, dtype: torch.dtype) -> None:
+        """Setup KV caches."""
         device = next(self.parameters()).device
-        self.logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}")
+        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, dtype={dtype}")
 
-        with torch.device(device):
-            # Setup backbone cache - try without dtype
-            if hasattr(self.backbone, 'setup_caches'):
-                 try:
-                      self.backbone.setup_caches(batch_size=max_batch_size)
-                      self.logger.info(">>> Backbone caches setup call completed.")
-                 except TypeError as e:
-                      self.logger.error(f"Failed to call backbone.setup_caches: {e}")
-                      # Try original call with dtype as fallback
-                      try:
-                          dtype = next(self.parameters()).dtype
-                          self.logger.warning("Retrying backbone setup_caches WITH dtype...")
-                          self.backbone.setup_caches(batch_size=max_batch_size, dtype=dtype)
-                          self.logger.info(">>> Backbone caches setup call completed (with dtype fallback).")
-                      except Exception as e2:
-                          self.logger.error(f"Fallback backbone setup_caches also failed: {e2}")
-                          raise
-                 except Exception as e_other:
-                     self.logger.error(f"Unexpected error during backbone cache setup: {e_other}")
-                     raise
-            else:
-                 self.logger.warning("Backbone does not have setup_caches method.")
+        try:
+            logger.debug("Calling backbone.setup_caches...")
+            self.backbone.setup_caches(max_batch_size, dtype=dtype)
+            logger.debug(">>> Backbone caches setup call completed.")
+        except Exception as e:
+            logger.error(f"Failed to call backbone.setup_caches: {e}", exc_info=True)
+            # Attempt fallback if specific error occurs? (Removed retry from here, handled in generator init)
 
-            # Setup decoder cache - try without dtype
-            if hasattr(self.decoder, 'setup_caches'):
-                 try:
-                     self.decoder.setup_caches(batch_size=max_batch_size)
-                     self.logger.info(f">>> Decoder caches setup call completed.")
-                 except TypeError as e:
-                     self.logger.error(f"Failed to call decoder.setup_caches: {e}")
-                     # Try original call with dtype as fallback
-                     try:
-                          dtype = next(self.parameters()).dtype
-                          self.logger.warning("Retrying decoder setup_caches WITH dtype...")
-                          self.decoder.setup_caches(batch_size=max_batch_size, dtype=dtype)
-                          self.logger.info(f">>> Decoder caches setup call completed (with dtype fallback).")
-                     except Exception as e2:
-                         self.logger.error(f"Fallback decoder setup_caches also failed: {e2}")
-                         raise
-                 except Exception as e_other:
-                     self.logger.error(f"Unexpected error during decoder cache setup: {e_other}")
-                     raise
-            else:
-                self.logger.warning("Decoder does not have setup_caches method.")
+        try:
+            logger.debug("Calling decoder.setup_caches...")
+            self.decoder.setup_caches(max_batch_size, dtype=dtype, decoder_max_seq_len=self.config.audio_num_codebooks)
+            logger.debug(">>> Decoder caches setup call completed.")
+        except Exception as e:
+            logger.error(f"Failed to call decoder.setup_caches: {e}", exc_info=True)
+            # Attempt fallback if specific error occurs? (Removed retry from here, handled in generator init)
 
-        # Register buffers for masks AFTER cache setup
-        backbone_max_seq_len = getattr(self.backbone, 'max_seq_len', 2048) # Get actual max_seq_len if possible
-        self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
-        self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_max_seq_len, device), persistent=False)
-        self.logger.info("Causal mask buffers registered.")
+        # Causal mask setup (needs correct sequence lengths)
+        try:
+            backbone_max_seq_len = self.backbone.max_seq_len
+            decoder_mask_len = self.config.audio_num_codebooks
+            logger.debug(f"Creating causal masks: backbone_len={backbone_max_seq_len}, decoder_len={decoder_mask_len}")
+
+            # Detach previous buffers if they exist to allow replacement
+            if hasattr(self, 'backbone_causal_mask'):
+                del self.backbone_causal_mask
+            if hasattr(self, 'decoder_causal_mask'):
+                del self.decoder_causal_mask
+
+            self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
+            self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_mask_len, device), persistent=False)
+            logger.debug("Causal masks registered successfully.")
+        except AttributeError as e:
+             logger.error(f"Failed to get max_seq_len from backbone: {e}. Cannot create causal masks.")
+        except Exception as e:
+             logger.error(f"Error creating causal masks: {e}", exc_info=True)
 
     def reset_caches(self):
         if hasattr(self.backbone, 'reset_caches'):

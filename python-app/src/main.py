@@ -1,16 +1,29 @@
-import logging
-import logging.handlers
+import os
+app_dir = os.path.dirname(__file__)
+os.chdir(app_dir)
+print(f"INFO: Changed working directory to: {os.getcwd()}")
+
 from pathlib import Path
+import logging
 import asyncio
-import time
 import re
 from datetime import datetime
 import json
 import aiohttp
+import torch
 
-# --- UAGENTS Imports ---
-from uagents import Agent, Bureau, Context, Model
-from uagents.setup import fund_agent_if_low
+# --- Set Hugging Face Cache Environment Variables EARLY ---
+PROJECT_ROOT_ENV = Path(app_dir).parent.parent # Get project root reliably
+MODELS_DIR_ENV = PROJECT_ROOT_ENV / "models"
+MODELS_DIR_ENV.mkdir(exist_ok=True) # Ensure the base /models directory exists
+os.environ["HF_HOME"] = str(MODELS_DIR_ENV)
+os.environ["HUGGINGFACE_HUB_CACHE"] = str(MODELS_DIR_ENV)
+os.environ["TRANSFORMERS_CACHE"] = str(MODELS_DIR_ENV) # Also set TRANSFORMERS_CACHE
+# Optional: Disable internet check if you ONLY want local
+# os.environ["TRANSFORMERS_OFFLINE"] = "1"
+# os.environ["HF_DATASETS_OFFLINE"] = "1"
+print(f"INFO: HF_HOME/HUGGINGFACE_HUB_CACHE/TRANSFORMERS_CACHE set to: {MODELS_DIR_ENV}")
+# --- End Environment Variable Setup ---
 
 # --- Logging Setup (Keep as is) ---
 LOG_FILE = "./logs.txt"
@@ -34,13 +47,13 @@ logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.info("Application logger initialized (main.py).")
 
-# --- Third-Party Imports (Removed FastAPI/Starlette) ---
-import torch
-import torchaudio
-# from uagents import Agent, Context, Model # Keep if needed by panel logic, remove otherwise
-
 # --- Application Imports ---
 from sesame_tts import SesameTTS
+from generator import load_csm_1b_local # Assuming only local is used now
+
+# --- UAGENTS Imports (make explicit) ---
+from uagents import Agent, Bureau, Context
+from uagents import Model as UagentsModel
 
 # --- Constants / Config ---
 AGENTS = [
@@ -62,8 +75,7 @@ Conversational Style:
 - Focuses on data, logic, and first principles. Dismissive of arguments based on short-term price action or "intrinsic value" debates about physical objects.
 - Keep your responses concise and impactful, ideally 2-4 sentences. Be direct and stay laser-focused on Bitcoin's superiority.
 - Directly counter Peter Schiff's points about gold's history or Bitcoin's risks. Highlight gold's limitations in the digital world.
-"""
-    },
+""", "speaker_id": 0},
     {"name": "Peter Schiff", "seed": "peterschiff_seed",
      "prompt": """
 You are Peter Schiff, Chief Economist of Euro Pacific Capital and a staunch advocate for gold as the only true money and store of value. You are highly critical of fiat currency, central banking (especially the Federal Reserve), and speculative assets like Bitcoin.
@@ -84,14 +96,13 @@ Conversational Style:
 - Often predicts economic doom due to fiat currency debasement but sees gold as the only safe haven, not Bitcoin.
 - Keep your responses concise and biting, ideally 2-4 sentences. Directly challenge Saylor's claims.
 - Question the "digital energy" narrative and highlight Bitcoin's practical limitations and risks compared to gold.
-"""
-    },
+""", "speaker_id": 1},
 ]
 
 # --- UAGENTS Definitions ---
 
 # Message model for agent communication
-class Message(Model):
+class Message(UagentsModel):
     text: str
 
 # Flag to control agent activity (can be controlled by PanelManager)
@@ -157,23 +168,55 @@ schiff_agent = Agent(
 # fund_agent_if_low(schiff_agent.wallet.address())
 
 
-# --- PanelManager Class Definition (Modified for uAgents) ---
+# --- PanelManager Class Definition (Modified for conversation limit) ---
 class PanelManager:
     def __init__(self):
         logger.info("Initializing PanelManager...")
         self.status = "Idle"
         self.active = False
-        # Removed conversation_running flag - uagents loop controls itself via conversation_active
         self.history = []
         self.num_agents = 0
-        self.active_agents_list = [] # Store active agent instances
+        self.active_agents_list = []
         self.websockets = set()
-        self.bureau_task = None # Task handle for bureau.run()
-        self.bureau = None      # Bureau instance
+        self.bureau_task = None
+        self.bureau = None
 
-        # Removed TTS for simplicity, can be added back to handle_agent_response
-        self.tts = None
-        self.tts_available = False
+        # --- Initialize TTS using LOCAL loader ---
+        # Now torch is imported and can be used here
+        self.tts_device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Attempting to initialize SesameTTS on device: {self.tts_device}")
+
+        # --- Define the path to your LOCAL model directory ---
+        local_model_base_path = Path(app_dir).parent.parent / "models"
+        local_model_path = local_model_base_path # Pass the base /models path
+
+        logger.info(f"Attempting to load LOCAL model from: {local_model_path}")
+        try:
+            # --- CALL load_csm_1b_local ---
+            self.tts_generator = load_csm_1b_local(model_path=str(local_model_path), device=self.tts_device)
+
+            # --- Directly use the generator ---
+            self.tts = self.tts_generator
+            self.sample_rate = self.tts.sample_rate
+            self.tts_available = True
+            logger.info(f"SesameTTS initialized successfully using LOCAL model. Sample Rate: {self.sample_rate}")
+
+        except FileNotFoundError as e:
+             logger.error(f"LOCAL model directory/files not found at {local_model_path}: {e}", exc_info=True)
+             self.tts = None
+             self.tts_available = False
+        except Exception as e:
+            logger.error(f"Failed to initialize SesameTTS from LOCAL model: {str(e)}", exc_info=True)
+            self.tts = None
+            self.tts_available = False
+
+        self.agent_speaker_map = {agent["name"]: agent.get("speaker_id", 0) for agent in AGENTS}
+        logger.info(f"Agent Speaker ID Map: {self.agent_speaker_map}")
+
+        # --- ADD Conversation Counter ---
+        self.message_counter = 0
+        self.max_messages = 4 # Limit to 4 agent responses
+        # --- End Conversation Counter ---
 
     async def add_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Adding WebSocket connection from: {remote_addr or 'Unknown'}")
@@ -233,36 +276,190 @@ class PanelManager:
             "history": self.history
         }
 
-    async def handle_agent_response(self, agent_name: str, agent_address: str, text: str):
-        """Called by agent handlers to update history and broadcast."""
-        logger.info(f"PanelManager handling response from {agent_name}: {text[:60]}...")
-        if not self.active: return # Don't process if panel stopped
+    async def get_ollama_response(self, personality_prompt: str, message: str, history: list, agent_name: str, history_turns: int = 10) -> str: # Increased default turns slightly for chat
+        logger.info(f"--- (1) ENTERING get_ollama_response (Using /api/chat) for {agent_name} ---")
+        # --- Use the /api/chat endpoint ---
+        url = "http://127.0.0.1:11434/api/chat"
+        # --- End endpoint change ---
 
-        message_payload = {
-            "agent": agent_name, "address": agent_address,
-            "text": text, "timestamp": datetime.utcnow().isoformat() + "Z"
+        # --- Construct messages array ---
+        messages = []
+        # 1. System Prompt (Personality)
+        # Combine personality + general instruction for the system message
+        system_content = f"{personality_prompt}\n\nRespond in MAXIMUM 3 SENTENCES. Be casual and conversational. Use the conversation history for context."
+        messages.append({"role": "system", "content": system_content})
+
+        # 2. Recent History
+        # Get the last 'history_turns' messages (or fewer if history is short)
+        recent_history = history[-(history_turns):]
+        for msg in recent_history:
+             role = "assistant" if msg['agent'] == agent_name else "user"
+             # Skip adding the immediate preceding message if it's already represented by 'message' input?
+             # Or include it? Let's include it for now.
+             if msg['agent'] != 'System': # Exclude system messages from chat history
+                 messages.append({"role": role, "content": msg['text']})
+
+        # 3. The trigger message isn't explicitly needed here,
+        #    as the history includes the message this agent is responding to.
+        #    The final message in the list implies the assistant should generate the next response.
+
+        logger.debug(f"Messages being sent to Ollama /api/chat:\n{json.dumps(messages, indent=2)}")
+        # --- End construct messages array ---
+
+        payload = {
+            "model": "llama3", # Make sure this matches your Ollama model name
+            "messages": messages,
+            "stream": False
+            # Optional: Add generation parameters like temperature, top_p etc. in an "options" dictionary
+            # "options": {
+            #     "temperature": 0.7,
+            #     "num_predict": 100 # Max tokens to generate
+            # }
         }
-        self.history.append(message_payload)
-        await self.broadcast_message({"type": "agent_message", "payload": message_payload})
-        # Optionally add TTS call here
-        await self.broadcast_message({ # Reset status after message broadcast
+        try:
+            logger.info(f"--- (2) Preparing to send POST to Ollama at {url} ---")
+            async with aiohttp.ClientSession() as session:
+                logger.info(f"--- (3) Sending POST to Ollama CHAT NOW ---")
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response: # Increased timeout slightly
+                    logger.info(f"--- (4) Received Ollama status: {response.status} ---")
+                    if response.status == 200:
+                        data = await response.json()
+                        # --- Extract response from /api/chat structure ---
+                        if 'message' in data and 'content' in data['message']:
+                            response_text = data['message']['content']
+                            logger.info(f"Raw response content from Ollama /api/chat: {response_text[:200]}...")
+                            # Cleaning might still be useful if model adds extraneous text
+                            cleaned_response = extract_conversation(response_text) # Use existing cleaning function
+                            logger.info(f"Cleaned response: {cleaned_response[:100]}...")
+                            logger.info(f"--- (5) EXITING get_ollama_response (Success) ---")
+                            return cleaned_response
+                        else:
+                             logger.error(f"Ollama /api/chat response missing 'message.content': {data}")
+                             return "Error: Invalid response structure from Ollama chat."
+                        # --- End extraction ---
+                    else:
+                        error_text = await response.text()
+                        error_msg = f"Ollama returned status {response.status}. Response: {error_text[:200]}..."
+                        logger.error(error_msg)
+                        logger.info(f"--- (5) EXITING get_ollama_response (Ollama Error Status {response.status}) ---")
+                        return f"Error: Unable to get response from Ollama (Status {response.status})"
+        except asyncio.TimeoutError:
+             logger.error("--- (E1) EXITING get_ollama_response (Timeout Error) ---")
+             return "Error: Ollama request timed out."
+        except Exception as e:
+             logger.error(f"--- (E2) EXITING get_ollama_response (Exception: {e}) ---", exc_info=True)
+             return f"Error: {str(e)}"
+
+    async def handle_agent_response(self, agent_name: str, agent_address: str, text: str):
+        """Called by agent handlers to update history, broadcast, trigger TTS, and check message limit."""
+        logger.info(f"PanelManager handling response trigger from {agent_name} (responding to text: {text[:60]}...)")
+        if not self.active:
+             logger.warning("PanelManager: handle_agent_response called but panel is inactive. Skipping.")
+             return
+
+        # Increment counter FIRST
+        self.message_counter += 1
+        logger.info(f"Message Count: {self.message_counter}/{self.max_messages}")
+
+
+        # Trigger Ollama call WITH history and agent_name
+        logger.info(f"Triggering Ollama response for {agent_name}...")
+        # Pass the message received ('text') and the history UP TO THIS POINT
+        response_text = await self.get_ollama_response(
+            personality_prompt=SAYLOR_PROMPT if agent_name == "Michael Saylor" else SCHIFF_PROMPT,
+            message=text, # The message this agent is responding to (used for context if needed, though history is primary)
+            history=self.history, # Pass the history *before* this agent's response
+            agent_name=agent_name # Pass agent name for role assignment
+        )
+        cleaned_response = extract_conversation(response_text)
+        logger.info(f"Ollama response received and cleaned for {agent_name}.")
+
+        # Now create the payload for this agent's ACTUAL response
+        timestamp_iso_response = datetime.utcnow().isoformat() + "Z"
+        response_message_payload = {
+            "agent": agent_name,
+            "address": agent_address,
+            "text": cleaned_response, # Use the cleaned response from Ollama
+            "timestamp": timestamp_iso_response,
+            "audioStatus": "generating",
+            "audioUrl": None,
+        }
+        self.history.append(response_message_payload) # Add the *actual* response to history
+
+        # Broadcast this agent's response
+        logger.info(f"Broadcasting agent message for {timestamp_iso_response}")
+        await self.broadcast_message({"type": "agent_message", "payload": response_message_payload})
+
+        # Trigger TTS for this agent's response
+        logger.info(f"Creating background task for TTS generation for {timestamp_iso_response}")
+        asyncio.create_task(self.generate_and_broadcast_audio(response_message_payload))
+
+        # Update main panel status
+        await self.broadcast_message({
             "type": "status_update",
             "payload": {"status": f"Panel active ({self.num_agents} agents)", "active": True, "num_agents": self.num_agents}
         })
 
+        # Check limit AFTER processing and broadcasting the response
+        if self.message_counter >= self.max_messages:
+             logger.info(f"Reached message limit ({self.max_messages}). Stopping panel automatically.")
+             asyncio.create_task(self.stop_panel())
+
+    # --- NEW METHOD: Generate and Broadcast Audio ---
+    async def generate_and_broadcast_audio(self, message_payload: dict):
+        """Generates audio for a message and broadcasts the update."""
+        agent_name = message_payload["agent"]
+        text = message_payload["text"]
+        timestamp = message_payload["timestamp"]
+
+        if not self.tts_available:
+            logger.warning(f"TTS not available, skipping audio for {timestamp}.")
+            update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
+            await self.broadcast_message({"type": "audio_update", "payload": update_payload})
+            return
+
+        speaker_id = self.agent_speaker_map.get(agent_name, 0) # Get speaker ID from map, default 0
+        logger.info(f"Generating audio for msg [{timestamp}], speaker {speaker_id}...")
+
+        mp3_filepath = await self.tts.generate_audio_and_convert(text, speaker_id)
+
+        if mp3_filepath:
+            # Convert absolute filepath to relative URL path for frontend
+            try:
+                # Assuming 'static' is the base directory served
+                relative_path = os.path.relpath(mp3_filepath, 'static')
+                # Ensure forward slashes for URL
+                audio_url = "/" + relative_path.replace("\\", "/")
+                logger.info(f"Audio generated successfully for [{timestamp}]: {audio_url}")
+                update_payload = {"timestamp": timestamp, "audioStatus": "ready", "audioUrl": audio_url}
+            except ValueError as e:
+                 logger.error(f"Failed to create relative path for {mp3_filepath} relative to 'static': {e}. Sending failed status.")
+                 update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
+        else:
+            logger.error(f"Audio generation failed for msg [{timestamp}]")
+            update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
+
+        logger.info(f"Broadcasting audio update for msg [{timestamp}]: {update_payload}")
+        await self.broadcast_message({"type": "audio_update", "payload": update_payload})
+    # --- End NEW METHOD ---
+
     async def start_panel(self, num_agents_req: int):
         """Starts the uAgents Bureau and conversation."""
         global conversation_active
-        if self.active: return False # Already running
+        if self.active: return False
 
         logger.info(f"Starting panel with {num_agents_req} agents using uAgents Bureau.")
         self.num_agents = num_agents_req
         self.active = True
-        conversation_active = True # Enable agent message handling
+        conversation_active = True
         self.status = "Starting uAgents Bureau..."
+        # --- Reset counter on start ---
+        self.message_counter = 0
+        logger.info(f"Message counter reset to {self.message_counter}.")
+        # --- End Reset ---
         self.history = [{
             "agent": "System", "address": "system",
-            "text": f"AI Panel discussion started with {self.num_agents} agents (uAgents). Topic: Bitcoin vs Gold.",
+            "text": f"AI Panel discussion started with {self.num_agents} agents (uAgents). Topic: Bitcoin vs Gold. (Limit: {self.max_messages} responses)", # Added limit info
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }]
 
@@ -290,7 +487,7 @@ class PanelManager:
 
         self.status = f"Panel Active ({self.num_agents} agents running)"
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
-        await self.broadcast_message({"type": "system_message", "payload": {"text": f"uAgents panel started. {self.active_agents_list[0].name} will begin."}})
+        await self.broadcast_message({"type": "system_message", "payload": {"text": f"uAgents panel started with {self.num_agents} agents. (Limit: {self.max_messages} responses)"}})
 
         logger.info(f"Panel start sequence complete. Bureau task created. Status: {self.status}")
         return True
@@ -326,61 +523,13 @@ class PanelManager:
         logger.info("Panel stopped (uAgents).")
         return True
 
-    async def get_ollama_response(self, personality_prompt: str, message: str) -> str:
-        logger.info(f"--- (1) ENTERING get_ollama_response for prompt: {personality_prompt[:30]}... ---") # Log Entry
-        url = "http://127.0.0.1:11434/api/generate"
-        system_prompt = "Respond in MAXIMUM 3 SENTENCES. Be casual and conversational."
-        payload = {
-            "model": "deepseek-r1:1.5b",
-            "prompt": f"{system_prompt}\n\n{personality_prompt}\n\nQuestion/Context: {message}\n\nYour brief response (MAXIMUM 3 SENTENCES):",
-            "stream": False
-        }
-        try:
-            logger.info(f"--- (2) Preparing to send POST to Ollama at {url} ---") # Log Before Request
-            async with aiohttp.ClientSession() as session:
-                logger.info(f"--- (3) Sending POST to Ollama NOW ---") # Log Immediately Before Request
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=20)) as response:
-                    logger.info(f"--- (4) Received Ollama status: {response.status} ---") # Log After Response
-                    if response.status == 200:
-                        data = await response.json()
-                        response_text = data.get("response", "Error: No response field in Ollama data")
-                        logger.info(f"Raw response from Ollama: {response_text[:200]}...")
-                        cleaned_response = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL).strip()
-                        common_thinking_starts = ["Okay, so", "Alright, so", "Hmm, okay,", "Thinking:", "Let me break this down.", "Let me think.", "Here's my thought process:"]
-                        if cleaned_response == response_text:
-                            sentences = re.split(r'(?<=[.!?])\s+', cleaned_response)
-                            start_index = 0
-                            for i, sentence in enumerate(sentences):
-                                is_thinking = any(sentence.strip().startswith(phrase) for phrase in common_thinking_starts)
-                                if not is_thinking: start_index = i; break
-                            actual_reply = " ".join(sentences[start_index:]).strip()
-                            if actual_reply: cleaned_response = actual_reply
-                        cleaned_response = cleaned_response.strip()
-                        if not cleaned_response:
-                            logger.warning("Response cleaning resulted in empty string, returning raw response.")
-                            cleaned_response = response_text.strip()
-                        logger.info(f"Cleaned response: {cleaned_response[:100]}...")
-                        logger.info(f"--- (5) EXITING get_ollama_response (Success) ---")
-                        return cleaned_response
-                    else:
-                        error_msg = f"Ollama returned status {response.status}"
-                        logger.error(error_msg)
-                        logger.info(f"--- (5) EXITING get_ollama_response (Ollama Error Status {response.status}) ---")
-                        return f"Error: Unable to get response from Ollama (Status {response.status})"
-        except asyncio.TimeoutError:
-             logger.error("--- (E1) EXITING get_ollama_response (Timeout Error) ---")
-             return "Error: Ollama request timed out."
-        except Exception as e:
-             logger.error(f"--- (E2) EXITING get_ollama_response (Exception: {e}) ---", exc_info=True)
-             return f"Error: {str(e)}"
-
 
 # --- Create the single PanelManager instance ---
 panel_manager = PanelManager()
 logger.info("Global PanelManager instance created.")
 
 
-# --- UAGENTS Agent Handlers ---
+# --- UAGENTS Agent Handlers (Add check before sending reply) ---
 
 # Function to clean response (can be global or method)
 def extract_conversation(text: str) -> str:
@@ -399,14 +548,20 @@ async def handle_saylor_message(ctx: Context, sender: str, msg: Message):
         return
 
     logger.info("Saylor Agent: Calling PanelManager.get_ollama_response...")
-    response_text = await panel_manager.get_ollama_response(SAYLOR_PROMPT, msg.text)
+    response_text = await panel_manager.get_ollama_response(SAYLOR_PROMPT, msg.text, panel_manager.history, ctx.agent.name)
     cleaned_response = extract_conversation(response_text)
 
     logger.info("Saylor Agent: Calling PanelManager.handle_agent_response...")
+    # Handle response first (this increments counter and might trigger stop)
     await panel_manager.handle_agent_response(ctx.agent.name, ctx.agent.address, cleaned_response)
 
-    logger.info(f"Saylor Agent: Sending response to Schiff Agent ({schiff_agent.address}).")
-    await ctx.send(schiff_agent.address, Message(text=cleaned_response))
+    # Check if the panel is *still* active before sending the reply
+    if conversation_active:
+        logger.info(f"Saylor Agent: Sending response to Schiff Agent ({schiff_agent.address}).")
+        await ctx.send(schiff_agent.address, Message(text=cleaned_response))
+    else:
+        logger.info("Saylor Agent: Panel stopped after handling response, not sending reply.")
+
 
 @schiff_agent.on_message(model=Message, replies=Message)
 async def handle_schiff_message(ctx: Context, sender: str, msg: Message):
@@ -416,28 +571,46 @@ async def handle_schiff_message(ctx: Context, sender: str, msg: Message):
         return
 
     logger.info("Schiff Agent: Calling PanelManager.get_ollama_response...")
-    response_text = await panel_manager.get_ollama_response(SCHIFF_PROMPT, msg.text)
+    response_text = await panel_manager.get_ollama_response(SCHIFF_PROMPT, msg.text, panel_manager.history, ctx.agent.name)
     cleaned_response = extract_conversation(response_text)
 
     logger.info("Schiff Agent: Calling PanelManager.handle_agent_response...")
+    # Handle response first (this increments counter and might trigger stop)
     await panel_manager.handle_agent_response(ctx.agent.name, ctx.agent.address, cleaned_response)
 
-    logger.info(f"Schiff Agent: Sending response to Saylor Agent ({saylor_agent.address}).")
-    await ctx.send(saylor_agent.address, Message(text=cleaned_response))
+    # Check if the panel is *still* active before sending the reply
+    if conversation_active:
+        logger.info(f"Schiff Agent: Sending response to Saylor Agent ({saylor_agent.address}).")
+        await ctx.send(saylor_agent.address, Message(text=cleaned_response))
+    else:
+        logger.info("Schiff Agent: Panel stopped after handling response, not sending reply.")
 
-# Startup event on Saylor agent to kick off the conversation
+
+# Modify startup event slightly to not double-count the first message
 @saylor_agent.on_event("startup")
 async def agent_startup(ctx: Context):
-    # *** FIX HERE: Use ctx.agent.name (and ensure ctx.agent.address exists) ***
-    agent_name = ctx.agent.name  # Get name from agent object
-    agent_address = ctx.agent.address # Get address from agent object
+    agent_name = ctx.agent.name
+    agent_address = ctx.agent.address
     logger.info(f"{agent_name} ({agent_address}) startup event.")
+
+    # Check panel_manager directly
     if panel_manager.active:
+        # Define the initial topic
         initial_topic = "Let's debate the true store of value: Bitcoin versus Gold. Peter, gold has history, but isn't Bitcoin superior digital scarcity?"
-        logger.info(f"{agent_name}: Sending initial message to Schiff Agent: {initial_topic}")
-        # Use the retrieved agent_name and agent_address
+
+        # Log the initial message and handle it via PanelManager (increments counter, triggers TTS)
+        logger.info(f"{agent_name}: Handling initial message via PanelManager: {initial_topic}")
         await panel_manager.handle_agent_response(agent_name, agent_address, initial_topic)
-        await ctx.send(schiff_agent.address, Message(text=initial_topic))
+
+        # Check if the panel is still active *after* handling the first response (e.g., if max_messages was 1)
+        # Use panel_manager.active, not conversation_active which might have timing issues here
+        if panel_manager.active:
+            logger.info(f"{agent_name}: Sending initial message to Schiff Agent via ctx.send().")
+            # --- FIX: Use ctx.send() here ---
+            await ctx.send(schiff_agent.address, Message(text=initial_topic))
+            # --- End FIX ---
+        else:
+            logger.info(f"{agent_name}: Panel stopped after handling initial message (max_messages=1?), not sending to Schiff.")
     else:
         logger.info(f"{agent_name}: Startup event fired, but panel is not active. No initial message sent.")
 

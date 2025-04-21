@@ -6,6 +6,7 @@ from aiohttp import web
 import aiohttp_cors
 from datetime import datetime
 import json
+from pathlib import Path
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
@@ -120,6 +121,15 @@ def setup_routes(app):
 
     # Add WebSocket Route using the handler IMPORTED from main.py
     add_route("/ws", websocket_handler)
+
+    # --- ADD STATIC ROUTE FOR AUDIO FILES ---
+    # Determine the path relative to this script's location
+    static_audio_path = Path(__file__).parent / 'static' / 'audio'
+    # Ensure the directory exists (optional, but good practice)
+    static_audio_path.mkdir(parents=True, exist_ok=True)
+    app.router.add_static('/audio', path=str(static_audio_path), name='audio', show_index=False) # Set show_index=False
+    logger.info(f"Added static route for /audio serving from {static_audio_path}")
+    # --- END STATIC ROUTE ---
 
     logger.info("Routes setup complete.")
 

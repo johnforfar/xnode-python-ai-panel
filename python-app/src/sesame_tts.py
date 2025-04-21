@@ -53,9 +53,8 @@ class SesameTTS:
             os.environ["HF_HOME"] = str(resolved_model_dir)
             os.environ["HUGGINGFACE_HUB_CACHE"] = str(resolved_model_dir)
 
-            logger.info(f"Loading CSM model via load_csm_1b from generator.py (Path: {resolved_model_dir})...")
-            # Call the load_csm_1b function which now handles local loading
-            # Pass the resolved Path object
+            logger.info(f"Loading CSM model via load_csm_1b from generator.py (Path: {resolved_model_dir}, Device: {device})...")
+            # Pass the device STRING as required by load_csm_1b signature
             self.generator = load_csm_1b(device=device, model_dir=resolved_model_dir)
 
             if not hasattr(self.generator, 'generate') or not hasattr(self.generator, 'sample_rate'):
