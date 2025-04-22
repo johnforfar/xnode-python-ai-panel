@@ -82,7 +82,7 @@ in
         #  DB_USER = "game";
         #  DB_PASS = "game";
         SECRET = cfg.secret;
-        LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+        LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib;/run/opengl-driver/lib";
         MODELSDIR = "/models";
         DATADIR = "/ai-panel-data";
       };
@@ -92,17 +92,6 @@ in
         Group = "ai-panel-backend";
         WorkingDirectory = "/ai-panel-data";
         Restart = "on-failure";
-        DeviceAllow = [
-          # CUDA
-          # https://docs.nvidia.com/dgx/pdf/dgx-os-5-user-guide.pdf
-          "char-nvidiactl"
-          "char-nvidia-caps"
-          "char-nvidia-frontend"
-          "char-nvidia-uvm"
-          # ROCm
-          "char-drm"
-          "char-kfd"
-        ];
       };
     };
 
