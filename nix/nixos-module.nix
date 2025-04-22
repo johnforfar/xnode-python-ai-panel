@@ -72,6 +72,7 @@ in
       ];
       path = [
         pkgs.git
+        pkgs.ffmpeg
       ];
       environment = {
         PORT = toString 8000;
