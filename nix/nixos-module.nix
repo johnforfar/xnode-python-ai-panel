@@ -96,7 +96,7 @@ in
 
     services.ollama = {
       enable = true;
-      loadModels = [ "deepseek-r1:1.5b" ];
+      loadModels = [ "llama3" ];
     };
 
     #services.postgresql = {
