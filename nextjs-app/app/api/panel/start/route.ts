@@ -1,51 +1,46 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Comment out backend URL/Secret for this test
 // const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8000';
 // const PYTHON_API_SECRET = process.env.PYTHON_API_SECRET;
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+const BACKEND_URL = 'http://127.0.0.1:8000'; // Use IPv4 loopback
 
-export async function POST(request: Request) {
-  console.log(`>>> API Route: POST /api/panel/start called`);
-  const targetUrl = `${BACKEND_URL}/api/start`;
-  let requestBody: any;
-
+export async function POST(request: NextRequest) {
+  console.log(">>> API Route: POST /api/panel/start called");
   try {
-     requestBody = await request.json();
-     const numAgents = requestBody.numAgents || 2; // Extract numAgents or default
-     console.log(`>>> API Route: Attempting to fetch backend at: ${targetUrl} with body:`, requestBody);
+    // No need to parse frontend body anymore, just forward the request
 
-     const backendResponse = await fetch(targetUrl, {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ numAgents: numAgents }), // Send necessary data
-     });
+    // --- REMOVE body from fetch ---
+    const backendResponse = await fetch(`${BACKEND_URL}/api/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Add any other necessary headers
+      },
+      // body: JSON.stringify({}), // No body needed
+      cache: 'no-store',
+    });
+    // --- End REMOVE ---
+
+    const responseData = await backendResponse.json().catch(() => ({})); // Attempt to parse JSON, default to {} on failure
 
     if (!backendResponse.ok) {
-      const errorText = await backendResponse.text().catch(() => 'Could not read backend error response');
-      console.error(`<<< API Route: Backend fetch FAILED! Target: ${targetUrl}, Backend Status: ${backendResponse.status}, Response: ${errorText.substring(0, 150)}...`);
+      console.error(`<<< API Route: Backend fetch FAILED! Target: ${BACKEND_URL}/api/start, Backend Status: ${backendResponse.status}, Response: ${JSON.stringify(responseData).substring(0, 100)}...`);
       return NextResponse.json(
-          { error: `Backend returned status ${backendResponse.status}`, details: errorText.substring(0, 150) },
-          { status: 500 }
+        { error: responseData.error || 'Failed to start panel on backend', details: responseData.message },
+        { status: backendResponse.status }
       );
     }
 
-    const data = await backendResponse.json();
-    console.log(`<<< API Route: Backend start request successful from ${targetUrl}.`);
-    return NextResponse.json(data);
+    console.log(`<<< API Route: Backend start successful. Status: ${backendResponse.status}, Response:`, responseData);
+    return NextResponse.json(responseData, { status: backendResponse.status });
 
   } catch (error: any) {
-     if (error instanceof SyntaxError) {
-        console.error(`<<< API Route: Invalid JSON in request body for ${targetUrl}.`);
-        return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
-     }
-    const causeCode = error.cause?.code;
-    const errorMessage = `<<< API Route: CRITICAL ERROR fetching backend at ${targetUrl}. Cause: ${causeCode || error.message || 'Unknown fetch error'}`;
-    console.error(errorMessage);
+    console.error(">>> API Route Error in /api/panel/start:", error);
     return NextResponse.json(
-        { error: `Failed to connect to backend service. Is it running?`, cause: causeCode || error.message },
-        { status: 500 }
+      { error: 'Internal Server Error in Next.js proxy', details: error.message },
+      { status: 500 }
     );
   }
 }

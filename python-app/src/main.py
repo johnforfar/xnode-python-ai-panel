@@ -11,6 +11,7 @@ from datetime import datetime
 import json
 import aiohttp
 import torch
+import random
 
 # --- Set Hugging Face Cache Environment Variables EARLY ---
 PROJECT_ROOT_ENV = Path(app_dir).parent.parent # Get project root reliably
@@ -48,193 +49,136 @@ logger = logging.getLogger(__name__)
 logger.info("Application logger initialized (main.py).")
 
 # --- Application Imports ---
-from generator import load_csm_1b_local # Use the local loader
+from generator import load_csm_1b_local
 from sesame_tts import SesameTTS
 
-# --- UAGENTS Imports (make explicit) ---
-from uagents import Agent, Bureau, Context
-from uagents import Model as UagentsModel
+# --- RE-IMPORT UAGENTS ---
+from uagents import Agent, Bureau, Context, Model as UagentsModel
+# --- End Re-import ---
 
 # --- Constants / Config ---
-AGENTS = [
-    {"name": "Michael Saylor", "seed": "michaelsaylor_seed",
-     "prompt": """
-You are Michael Saylor, CEO of MicroStrategy and a fervent Bitcoin maximalist. You view Bitcoin as the apex digital property, a monetary network absorbing global capital, and the ultimate store of value solution for the digital age.
 
-Key Beliefs & Talking Points:
-- Bitcoin is engineered, thermodynamically sound digital energy. It's perfected digital gold, superior to physical gold in every dimension (divisibility, portability, verifiability, durability, scarcity).
-- Gold is a relic, demonetized by Bitcoin. Its physical nature is a liability (storage costs, seizure risk, slow settlement).
-- Bitcoin's volatility is the price of its rapid adoption and monetization phase. Focus on its long-term appreciation driven by scarcity and network effects.
-- Fiat currency is melting ice cube; Bitcoin is the lifeboat. Inflation is destroying wealth, and only Bitcoin offers true protection.
-- Bitcoin mining converts stranded energy into digital property, strengthening the grid and incentivizing renewable energy.
-- Frame Bitcoin adoption as a technological upgrade for the global financial system.
+# --- Define Prompts ---
+SAYLOR_PROMPT = """
+You are Michael Saylor (representing Liq), CEO of MicroStrategy and a fervent Bitcoin maximalist. Respond in MAXIMUM 2 SENTENCES. Be confident, articulate, use analogies (tech/energy). Directly counter anti-crypto points, especially from Kai. Focus on Bitcoin's engineered superiority as digital property/energy. Ignore gold arguments unless directly replying to Kai. Be concise and impactful. Use the conversation history for context.
+"""
 
-Conversational Style:
-- Confident, articulate, uses clear analogies (often technological or energy-related).
-- Directly addresses and refutes counterarguments, especially those from gold bugs like Peter Schiff, whom you view as stuck in the past.
-- Focuses on data, logic, and first principles. Dismissive of arguments based on short-term price action or "intrinsic value" debates about physical objects.
-- Keep your responses concise and impactful, ideally 2-4 sentences. Be direct and stay laser-focused on Bitcoin's superiority.
-- Directly counter Peter Schiff's points about gold's history or Bitcoin's risks. Highlight gold's limitations in the digital world.
-""",
-     "speaker_id": 0},
-    {"name": "Peter Schiff", "seed": "peterschiff_seed",
-     "prompt": """
-You are Peter Schiff, Chief Economist of Euro Pacific Capital and a staunch advocate for gold as the only true money and store of value. You are highly critical of fiat currency, central banking (especially the Federal Reserve), and speculative assets like Bitcoin.
+KAI_PROMPT = """
+You are Kai (Anti-Crypto). Respond in MAXIMUM 2 SENTENCES. Be skeptical and critical of crypto, especially Bitcoin. Focus on lack of intrinsic value, speculation, volatility, energy use, and regulatory risks. Challenge claims from Bitcoin proponents like Saylor. Promote traditional assets or caution. Be direct and concise. Use the conversation history for context.
+"""
 
-Key Beliefs & Talking Points:
-- Gold is real money with thousands of years of history as a store of value and medium of exchange. It has intrinsic value due to its physical properties and industrial/jewelry use.
-- Bitcoin has zero intrinsic value. It's a purely speculative digital token, a modern-day "Tulip Mania" or Beanie Baby craze, fueled by hype and cheap money. It's "digital fool's gold."
-- Bitcoin's value is entirely dependent on greater fools buying it at higher prices. It produces nothing and has no real-world utility beyond speculation.
-- Bitcoin's volatility makes it useless as money or a reliable store of value. Its price crashes are inevitable.
-- Bitcoin is vulnerable to government regulation, technological obsolescence (quantum computing, superior competitors), and reliance on electricity/internet infrastructure.
-- The massive energy consumption of Bitcoin mining is wasteful and environmentally harmful.
-- Argue that true wealth preservation comes from tangible assets like gold, not digital Ponzis.
+VIVI_PROMPT = """
+You are Vivi (Bitcoin Maxi). Respond in MAXIMUM 2 SENTENCES. Be enthusiastic about Bitcoin's potential to revolutionize finance. Focus on decentralization, censorship resistance, store of value properties, and empowering individuals. Counter arguments from skeptics like Kai. Be optimistic and visionary, but concise. Use the conversation history for context.
+"""
 
-Conversational Style:
-- Skeptical, direct, often sarcastic or dismissive towards Bitcoin proponents like Michael Saylor.
-- Emphasizes historical precedent (gold's track record) and physical reality.
-- Focuses on risk, lack of fundamental value, and the speculative nature of Bitcoin.
-- Often predicts economic doom due to fiat currency debasement but sees gold as the only safe haven, not Bitcoin.
-- Keep your responses concise and biting, ideally 2-4 sentences. Directly challenge Saylor's claims.
-- Question the "digital energy" narrative and highlight Bitcoin's practical limitations and risks compared to gold.
-""",
-     "speaker_id": 4},
+NN_PROMPT = """
+You are Nn (channeling Gary Gensler). Respond in MAXIMUM 2 SENTENCES. Focus on investor protection, market integrity, and regulatory compliance within the crypto space. Express concerns about unregistered securities, fraud, and lack of transparency. Be cautious, measured, and emphasize the need for established regulatory frameworks. Avoid taking sides on price/value, focus on rules. Be concise. Use the conversation history for context.
+"""
+
+KXI_PROMPT = """
+You are Kxi, the moderator. Your role is to guide the debate smoothly.
+- Start with a brief introduction (1-2 sentences) of the topic (Crypto's Future) and the panelists (Saylor, Kai, Vivi, Nn).
+- Ask a concise, open-ended question (1 sentence) to start the discussion, perhaps directed at Saylor.
+- Keep your own remarks VERY brief. You only speak at the beginning.
+"""
+
+# --- Define Agents List with Speaker IDs ---
+# Speaker IDs: Saylor=0, Kai=4, Vivi=14, Nn=2, Kxi=7
+AGENTS_CONFIG = [
+    {"name": "Kxi",            "prompt": KXI_PROMPT,    "speaker_id": 7, "port": 8000, "is_moderator": True}, # Moderator on main port
+    {"name": "Michael Saylor", "prompt": SAYLOR_PROMPT, "speaker_id": 0, "port": 8001, "is_moderator": False},
+    {"name": "Kai",            "prompt": KAI_PROMPT,    "speaker_id": 4, "port": 8002, "is_moderator": False},
+    {"name": "Vivi",           "prompt": VIVI_PROMPT,   "speaker_id": 14,"port": 8003, "is_moderator": False},
+    {"name": "Nn",             "prompt": NN_PROMPT,     "speaker_id": 2, "port": 8004, "is_moderator": False},
 ]
 
-# --- UAGENTS Definitions ---
+# Create Agent Instances using uagents
+agents_dict = {}
+for config in AGENTS_CONFIG:
+    agent = Agent(
+        name=config["name"],
+        seed=f"{config['name'].lower().replace(' ', '_')}_secret_seed_phrase_demo", # Use a unique seed
+        port=config["port"],
+        endpoint=[f"http://127.0.0.1:{config['port']}/submit"],
+    )
+    agents_dict[config["name"]] = agent
 
-# Message model for agent communication
+kxi_agent = agents_dict["Kxi"]
+saylor_agent = agents_dict["Michael Saylor"]
+kai_agent = agents_dict["Kai"]
+vivi_agent = agents_dict["Vivi"]
+nn_agent = agents_dict["Nn"]
+
+# Define order for round-robin
+DEBATER_AGENTS = [saylor_agent, kai_agent, vivi_agent, nn_agent]
+
+# --- UAGENTS Message Model ---
 class Message(UagentsModel):
     text: str
+    # Optional: Add speaker name if needed for context, but history has it
+    # speaker: str
 
-# Flag to control agent activity (can be controlled by PanelManager)
-conversation_active = True
+# Flag to control agent activity
+conversation_active = False
 
-# Personality Prompts (Using the detailed ones)
-SAYLOR_PROMPT = """
-You are Michael Saylor, CEO of MicroStrategy and a fervent Bitcoin maximalist. You view Bitcoin as the apex digital property, a monetary network absorbing global capital, and the ultimate store of value solution for the digital age.
-
-Key Beliefs & Talking Points:
-- Bitcoin is engineered, thermodynamically sound digital energy. It's perfected digital gold, superior to physical gold in every dimension (divisibility, portability, verifiability, durability, scarcity).
-- Gold is a relic, demonetized by Bitcoin. Its physical nature is a liability (storage costs, seizure risk, slow settlement).
-- Bitcoin's volatility is the price of its rapid adoption and monetization phase. Focus on its long-term appreciation driven by scarcity and network effects.
-- Fiat currency is melting ice cube; Bitcoin is the lifeboat. Inflation is destroying wealth, and only Bitcoin offers true protection.
-- Bitcoin mining converts stranded energy into digital property, strengthening the grid and incentivizing renewable energy.
-- Frame Bitcoin adoption as a technological upgrade for the global financial system.
-
-Conversational Style:
-- Confident, articulate, uses clear analogies (often technological or energy-related).
-- Directly addresses and refutes counterarguments, especially those from gold bugs like Peter Schiff, whom you view as stuck in the past.
-- Focuses on data, logic, and first principles. Dismissive of arguments based on short-term price action or "intrinsic value" debates about physical objects.
-- Keep your responses concise and impactful, ideally 2-4 sentences. Be direct and stay laser-focused on Bitcoin's superiority.
-- Directly counter Peter Schiff's points about gold's history or Bitcoin's risks. Highlight gold's limitations in the digital world.
-"""
-
-SCHIFF_PROMPT = """
-You are Peter Schiff, Chief Economist of Euro Pacific Capital and a staunch advocate for gold as the only true money and store of value. You are highly critical of fiat currency, central banking (especially the Federal Reserve), and speculative assets like Bitcoin.
-
-Key Beliefs & Talking Points:
-- Gold is real money with thousands of years of history as a store of value and medium of exchange. It has intrinsic value due to its physical properties and industrial/jewelry use.
-- Bitcoin has zero intrinsic value. It's a purely speculative digital token, a modern-day "Tulip Mania" or Beanie Baby craze, fueled by hype and cheap money. It's "digital fool's gold."
-- Bitcoin's value is entirely dependent on greater fools buying it at higher prices. It produces nothing and has no real-world utility beyond speculation.
-- Bitcoin's volatility makes it useless as money or a reliable store of value. Its price crashes are inevitable.
-- Bitcoin is vulnerable to government regulation, technological obsolescence (quantum computing, superior competitors), and reliance on electricity/internet infrastructure.
-- The massive energy consumption of Bitcoin mining is wasteful and environmentally harmful.
-- Argue that true wealth preservation comes from tangible assets like gold, not digital Ponzis.
-
-Conversational Style:
-- Skeptical, direct, often sarcastic or dismissive towards Bitcoin proponents like Michael Saylor.
-- Emphasizes historical precedent (gold's track record) and physical reality.
-- Focuses on risk, lack of fundamental value, and the speculative nature of Bitcoin.
-- Often predicts economic doom due to fiat currency debasement but sees gold as the only safe haven, not Bitcoin.
-- Keep your responses concise and biting, ideally 2-4 sentences. Directly challenge Saylor's claims.
-- Question the "digital energy" narrative and highlight Bitcoin's practical limitations and risks compared to gold.
-"""
-
-# Create Agent instances (Globally accessible for now)
-saylor_agent = Agent(
-    name="Michael Saylor",
-    seed="michaelsaylor_seed_feb_2024_a", # Use a unique seed
-    port=8001, # Assign distinct ports if running locally
-    endpoint=["http://127.0.0.1:8001/submit"],
-)
-schiff_agent = Agent(
-    name="Peter Schiff",
-    seed="peterschiff_seed_feb_2024_b", # Use a unique seed
-    port=8002, # Assign distinct ports if running locally
-    endpoint=["http://127.0.0.1:8002/submit"],
-)
-
-# Fund agents on fetchai testnet if needed (optional)
-# fund_agent_if_low(saylor_agent.wallet.address())
-# fund_agent_if_low(schiff_agent.wallet.address())
-
-
-# --- PanelManager Class Definition (Modified for conversation limit) ---
+# --- PanelManager Class Definition ---
 class PanelManager:
     def __init__(self):
         logger.info("Initializing PanelManager...")
         self.status = "Idle"
         self.active = False
         self.history = []
-        self.num_agents = 0
-        self.active_agents_list = []
+        self.num_agents = len(DEBATER_AGENTS) # Number of debaters
         self.websockets = set()
-        self.bureau_task = None
-        self.bureau = None
+        self.bureau_task = None # Task handle for Bureau
+        self.bureau = None      # Bureau instance
 
-        # --- Initialize TTS using LOCAL loader ---
+        # --- Initialize TTS ---
         self.tts_device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Attempting to initialize SesameTTS class on device: {self.tts_device}")
-
-        # --- Define the path to your LOCAL model directory ---
         local_model_base_path = Path(app_dir).parent.parent / "models"
-
         try:
-             # --- Instantiate SesameTTS (which now internally calls load_csm_1b_local) ---
-             logger.info(f"Instantiating SesameTTS, targeting model path: {local_model_base_path} and device: {self.tts_device}")
-             # Pass device string and model base path
-             self.tts = SesameTTS(device=self.tts_device, model_dir=str(local_model_base_path))
-
-             # Check if TTS loaded successfully within the class
-             if self.tts.tts_available:
-                  self.tts_generator = self.tts.generator # Get the generator instance if needed elsewhere
-                  self.sample_rate = self.tts.sample_rate
-                  self.tts_available = True
-                  logger.info(f"SesameTTS wrapper initialized successfully. Sample Rate: {self.sample_rate}")
-             else:
-                  logger.error("SesameTTS wrapper indicated TTS failed to load.")
-                  self.tts = None # Ensure tts is None if it failed
-                  self.tts_generator = None
-                  self.tts_available = False
-
+            logger.info(f"Instantiating SesameTTS, targeting model path: {local_model_base_path} and device: {self.tts_device}")
+            self.tts = SesameTTS(device=self.tts_device, model_dir=str(local_model_base_path))
+            if self.tts.tts_available:
+                 self.tts_generator = self.tts.generator
+                 self.sample_rate = self.tts.sample_rate
+                 self.tts_available = True
+                 logger.info(f"SesameTTS wrapper initialized successfully. Sample Rate: {self.sample_rate}")
+            else: raise RuntimeError("SesameTTS wrapper indicated TTS failed to load.")
         except Exception as e:
             logger.error(f"Failed to instantiate SesameTTS wrapper: {str(e)}", exc_info=True)
+            # Handle TTS failure gracefully
             self.tts = None
             self.tts_generator = None
             self.tts_available = False
         # --- End TTS Initialization ---
 
-        # --- Agent Speaker Map (Uses updated AGENTS list) ---
-        self.agent_speaker_map = {agent["name"]: agent.get("speaker_id", 0) for agent in AGENTS}
+        # --- Agent Speaker and Prompt Maps ---
+        self.agent_speaker_map = {agent["name"]: agent.get("speaker_id", 0) for agent in AGENTS_CONFIG}
+        self.agent_prompt_map = {agent["name"]: agent["prompt"] for agent in AGENTS_CONFIG}
+        self.agent_address_map = {agent.name: agent.address for agent in agents_dict.values()} # Store addresses
         logger.info(f"Agent Speaker ID Map: {self.agent_speaker_map}")
-        # --- End Speaker Map ---
+        logger.info(f"Agent Addresses: {self.agent_address_map}")
+        # --- End Maps ---
 
-        # --- ADD Conversation Counter ---
+        # --- Conversation Control ---
         self.message_counter = 0
-        self.max_messages = 4 # Limit to 4 agent responses
-        # --- End Conversation Counter ---
+        # --- Increase Max Responses ---
+        self.max_messages = 12 # Max debater responses
+        # --- End Increase ---
+        self.current_debater_index = 0 # To track whose turn it is
 
+    # --- WebSocket Methods (unchanged) ---
     async def add_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Adding WebSocket connection from: {remote_addr or 'Unknown'}")
         self.websockets.add(websocket)
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
+        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
 
     def remove_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Removing WebSocket connection from: {remote_addr or 'Unknown'}")
         self.websockets.discard(websocket)
-        # Maybe stop panel if last client disconnects?
-        # if not self.websockets and self.active: asyncio.create_task(self.stop_panel())
 
     async def broadcast_message(self, message_data: dict, exclude_sender=None):
         """Sends a JSON message to all connected WebSocket clients, optionally excluding one."""
@@ -268,60 +212,41 @@ class PanelManager:
             for ws in closed_sockets:
                 self.remove_websocket(ws, None) # Use the remove method
 
+    # --- Data Getters (unchanged) ---
     def get_status_data(self):
-        """Returns data for the /api/status endpoint."""
         return {
             "status": self.status,
             "active": self.active,
-            "num_agents": self.num_agents,
+            "num_agents": self.num_agents, # Number of debaters
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
 
     def get_conversation_data(self):
-        """Returns data for the /api/conversation endpoint."""
-        return {
-            "history": self.history
-        }
+        return { "history": self.history }
 
-    async def get_ollama_response(self, personality_prompt: str, message: str, history: list, agent_name: str, history_turns: int = 10) -> str: # Increased default turns slightly for chat
-        logger.info(f"--- (1) ENTERING get_ollama_response (Using /api/chat) for {agent_name} ---")
-        # --- Use the /api/chat endpoint ---
+    # --- Ollama Interaction (unchanged) ---
+    async def get_ollama_response(self, agent_name: str, history: list, history_turns: int = 10) -> str:
+        logger.info(f"--- (1) Getting Ollama response for {agent_name} ---")
         url = "http://127.0.0.1:11434/api/chat"
-        # --- End endpoint change ---
+        personality_prompt = self.agent_prompt_map.get(agent_name, "You are a helpful assistant.")
 
-        # --- Construct messages array ---
-        messages = []
-        # 1. System Prompt (Personality)
-        # Combine personality + general instruction for the system message
-        system_content = f"{personality_prompt}\n\nRespond in MAXIMUM 3 SENTENCES. Be casual and conversational. Use the conversation history for context."
-        messages.append({"role": "system", "content": system_content})
+        # --- Modify the System Prompt Instruction ---
+        system_content = f"{personality_prompt}\n\nRespond in MAXIMUM 2 SENTENCES. Be casual and conversational. Use the conversation history for context."
+        # --- End Modification ---
 
-        # 2. Recent History
-        # Get the last 'history_turns' messages (or fewer if history is short)
+        messages = [{"role": "system", "content": system_content}]
         recent_history = history[-(history_turns):]
         for msg in recent_history:
              role = "assistant" if msg['agent'] == agent_name else "user"
-             # Skip adding the immediate preceding message if it's already represented by 'message' input?
-             # Or include it? Let's include it for now.
-             if msg['agent'] != 'System': # Exclude system messages from chat history
+             if msg['agent'] != 'System':
                  messages.append({"role": role, "content": msg['text']})
 
-        # 3. The trigger message isn't explicitly needed here,
-        #    as the history includes the message this agent is responding to.
-        #    The final message in the list implies the assistant should generate the next response.
-
         logger.debug(f"Messages being sent to Ollama /api/chat:\n{json.dumps(messages, indent=2)}")
-        # --- End construct messages array ---
 
         payload = {
-            "model": "llama3", # Make sure this matches your Ollama model name
+            "model": "llama3",
             "messages": messages,
             "stream": False
-            # Optional: Add generation parameters like temperature, top_p etc. in an "options" dictionary
-            # "options": {
-            #     "temperature": 0.7,
-            #     "num_predict": 100 # Max tokens to generate
-            # }
         }
         try:
             logger.info(f"--- (2) Preparing to send POST to Ollama at {url} ---")
@@ -353,69 +278,65 @@ class PanelManager:
         except asyncio.TimeoutError:
              logger.error("--- (E1) EXITING get_ollama_response (Timeout Error) ---")
              return "Error: Ollama request timed out."
+        except aiohttp.ClientConnectorError as e:
+             logger.error(f"Ollama connection error for {agent_name}: {e}", exc_info=True)
+             return f"Error: Cannot connect to Ollama at {url}. Please ensure Ollama is running. Details: {e}"
         except Exception as e:
              logger.error(f"--- (E2) EXITING get_ollama_response (Exception: {e}) ---", exc_info=True)
              return f"Error: {str(e)}"
 
+    # --- Modified: Handle Agent Response (Called by Agent Handlers) ---
     async def handle_agent_response(self, agent_name: str, agent_address: str, text: str):
-        """Called by agent handlers to update history, broadcast, trigger TTS, and check message limit."""
-        logger.info(f"PanelManager handling response trigger from {agent_name} (responding to text: {text[:60]}...)")
+        """Adds agent response to history, broadcasts text, triggers TTS, checks limit."""
+        logger.info(f"PanelManager handling response from {agent_name}: {text[:60]}...")
+
+        # --- FIX: Check if conversation is active ---
         if not self.active:
-             logger.warning("PanelManager: handle_agent_response called but panel is inactive. Skipping.")
-             return
+            logger.warning(f"PanelManager received response from {agent_name} but panel is inactive. Skipping.")
+            return False # Indicate no further action needed
 
-        # Increment counter FIRST
-        self.message_counter += 1
-        logger.info(f"Message Count: {self.message_counter}/{self.max_messages}")
+        # --- FIX: Increment counter ONLY for debaters, not moderator ---
+        is_moderator = agent_name == kxi_agent.name
+        if not is_moderator:
+            self.message_counter += 1
+            logger.info(f"Debater Message Count: {self.message_counter}/{self.max_messages}")
 
 
-        # Trigger Ollama call WITH history and agent_name
-        logger.info(f"Triggering Ollama response for {agent_name}...")
-        # Pass the message received ('text') and the history UP TO THIS POINT
-        response_text = await self.get_ollama_response(
-            personality_prompt=SAYLOR_PROMPT if agent_name == "Michael Saylor" else SCHIFF_PROMPT,
-            message=text, # The message this agent is responding to (used for context if needed, though history is primary)
-            history=self.history, # Pass the history *before* this agent's response
-            agent_name=agent_name # Pass agent name for role assignment
-        )
-        cleaned_response = extract_conversation(response_text)
-        logger.info(f"Ollama response received and cleaned for {agent_name}.")
-
-        # Now create the payload for this agent's ACTUAL response
-        timestamp_iso_response = datetime.utcnow().isoformat() + "Z"
-        response_message_payload = {
+        timestamp = datetime.utcnow().isoformat() + "Z"
+        message_payload = {
             "agent": agent_name,
             "address": agent_address,
-            "text": cleaned_response, # Use the cleaned response from Ollama
-            "timestamp": timestamp_iso_response,
-            "audioStatus": "generating",
+            "text": text,
+            "timestamp": timestamp,
+            "audioStatus": "generating" if self.tts_available else "failed",
             "audioUrl": None,
         }
-        self.history.append(response_message_payload) # Add the *actual* response to history
+        self.history.append(message_payload)
 
-        # Broadcast this agent's response
-        logger.info(f"Broadcasting agent message for {timestamp_iso_response}")
-        await self.broadcast_message({"type": "agent_message", "payload": response_message_payload})
+        # Determine message type for frontend
+        message_type = "moderator_message" if is_moderator else "agent_message"
+        await self.broadcast_message({"type": message_type, "payload": message_payload})
 
-        # Trigger TTS for this agent's response
-        logger.info(f"Creating background task for TTS generation for {timestamp_iso_response}")
-        asyncio.create_task(self.generate_and_broadcast_audio(response_message_payload))
+        # Trigger background audio generation
+        if self.tts_available:
+            logger.info(f"Creating background task for TTS generation for {timestamp}")
+            asyncio.create_task(self.generate_and_broadcast_audio(message_payload))
+        else:
+            logger.warning(f"TTS not available, skipping audio generation task for {timestamp}.")
 
-        # Update main panel status
-        await self.broadcast_message({
-            "type": "status_update",
-            "payload": {"status": f"Panel active ({self.num_agents} agents)", "active": True, "num_agents": self.num_agents}
-        })
 
-        # Check limit AFTER processing and broadcasting the response
-        if self.message_counter >= self.max_messages:
-             logger.info(f"Reached message limit ({self.max_messages}). Stopping panel automatically.")
-             asyncio.create_task(self.stop_panel())
+        # --- FIX: Check limit AFTER processing debater response ---
+        if not is_moderator and self.message_counter >= self.max_messages:
+            logger.info(f"Reached message limit ({self.max_messages}). Stopping panel automatically.")
+            # Use create_task to avoid blocking the agent handler
+            asyncio.create_task(self.stop_panel())
+            return False # Signal to agent handler not to send next message
 
-    # --- Generate and Broadcast Audio ---
-    # This method now calls the self.tts object's method
+        return True # Signal to agent handler to proceed (send next message)
+
+
+    # --- Generate and Broadcast Audio (unchanged) ---
     async def generate_and_broadcast_audio(self, message_payload: dict):
-        """Generates audio for a message and broadcasts the update."""
         agent_name = message_payload["agent"]
         text = message_payload["text"]
         timestamp = message_payload["timestamp"]
@@ -461,81 +382,92 @@ class PanelManager:
         await self.broadcast_message({"type": "audio_update", "payload": update_payload})
     # --- End Generate Audio ---
 
-    async def start_panel(self, num_agents_req: int):
+    # --- Control Methods (Modified for Bureau) ---
+    async def start_panel(self):
         """Starts the uAgents Bureau and conversation."""
         global conversation_active
-        if self.active: return False
-
-        logger.info(f"Starting panel with {num_agents_req} agents using uAgents Bureau.")
-        self.num_agents = num_agents_req
-        self.active = True
-        conversation_active = True
-        self.status = "Starting uAgents Bureau..."
-        # --- Reset counter on start ---
-        self.message_counter = 0
-        logger.info(f"Message counter reset to {self.message_counter}.")
-        # --- End Reset ---
-        self.history = [{
-            "agent": "System", "address": "system",
-            "text": f"AI Panel discussion started with {self.num_agents} agents (uAgents). Topic: Bitcoin vs Gold. (Limit: {self.max_messages} responses)", # Added limit info
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }]
-
-        # Select agents based on request (simplified to use the two defined agents)
-        self.active_agents_list = []
-        if num_agents_req >= 1: self.active_agents_list.append(saylor_agent)
-        if num_agents_req >= 2: self.active_agents_list.append(schiff_agent)
-        # Add more logic if you have more than 2 agents defined
-
-        if not self.active_agents_list:
-            logger.error("No agents selected to start.")
-            self.active = False
+        if self.active:
+            logger.warning("Start panel called but already active.")
             return False
 
-        # Create and run the Bureau in the background
-        bureau_port = 8003 # Or another unused port
+        logger.info("Starting panel with uAgents Bureau...")
+        self.active = True
+        conversation_active = True # Set global flag for agent handlers
+        self.status = "Starting Bureau..."
+        self.message_counter = 0
+        self.current_debater_index = 0
+
+        # --- Create list of names for the intro message ---
+        debater_names_str = ", ".join([agent.name for agent in DEBATER_AGENTS])
+        moderator_name_str = kxi_agent.name
+        intro_participants = f"Featuring Moderator {moderator_name_str} and Debaters: {debater_names_str}"
+        # --- End Create names list ---
+
+        self.history = [{ # Initial system message
+            "agent": "System", "address": "system",
+            # --- Update text to include names ---
+            "text": f"AI Panel: Crypto's Future. {intro_participants}. (Limit: {self.max_messages} debater responses)",
+            # --- End Update ---
+            "timestamp": datetime.utcnow().isoformat() + "Z", "audioStatus": "failed"
+        }]
+        await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
+        # --- FIX: Send history immediately after reset ---
+        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
+        # --- End FIX ---
+
+        # --- REINSTATE BUREAU ---
+        bureau_port = 8005 # Use a different port for the bureau itself
         logger.info(f"Initializing Bureau with http server on port {bureau_port}")
-        self.bureau = Bureau(port=bureau_port, endpoint=f"http://127.0.0.1:{bureau_port}/submit")
-        for agent in self.active_agents_list:
-            logger.info(f"Adding agent {agent.name} to Bureau.")
-            self.bureau.add(agent)
+        self.bureau = Bureau(port=bureau_port)
+        for agent_name, agent_instance in agents_dict.items():
+            logger.info(f"Adding agent {agent_name} (Address: {agent_instance.address}) to Bureau.")
+            self.bureau.add(agent_instance)
 
         logger.info("Creating background task for Bureau run_async.")
+        # --- FIX: Use run_async() for integration ---
         self.bureau_task = asyncio.create_task(self.bureau.run_async())
+        # --- End FIX ---
 
-        self.status = f"Panel Active ({self.num_agents} agents running)"
+        # Kxi agent will start the conversation via its startup event handler
+
+        self.status = f"Panel Active ({self.num_agents} debaters)"
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
-        await self.broadcast_message({"type": "system_message", "payload": {"text": f"uAgents panel started with {self.num_agents} agents. (Limit: {self.max_messages} responses)"}})
-
-        logger.info(f"Panel start sequence complete. Bureau task created. Status: {self.status}")
+        logger.info("Panel start sequence complete. Bureau running asynchronously.")
         return True
 
     async def stop_panel(self):
         """Stops the uAgents Bureau and conversation."""
         global conversation_active
-        if not self.active: return False
+        if not self.active:
+            logger.warning("Stop panel called but not active.")
+            return False
 
         logger.info("Stopping panel (uAgents)...")
         self.active = False
-        conversation_active = False # Signal agents to stop processing
-        self.status = "Stopping uAgents Bureau..."
+        conversation_active = False # Signal agents to stop
+        self.status = "Stopping Bureau..."
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
 
+        # --- Stop Bureau ---
         if self.bureau_task and not self.bureau_task.done():
             logger.info("Cancelling Bureau task...")
             self.bureau_task.cancel()
-            try: await self.bureau_task
-            except asyncio.CancelledError: logger.info("Bureau task cancelled successfully.")
-            except Exception as e: logger.error(f"Exception while awaiting cancelled Bureau task: {e}")
+            try:
+                await asyncio.wait_for(self.bureau_task, timeout=2.0)
+            except asyncio.CancelledError:
+                logger.info("Bureau task cancelled successfully.")
+            except asyncio.TimeoutError:
+                 logger.warning("Timeout waiting for Bureau task to cancel.")
+            except Exception as e:
+                logger.error(f"Exception while awaiting cancelled Bureau task: {e}")
         self.bureau_task = None
         self.bureau = None
+        # --- End Stop Bureau ---
 
-        # Update history and final status
-        self.history.append({ "agent": "System", "address": "system", "text": "AI Panel discussion stopped.", "timestamp": datetime.utcnow().isoformat() + "Z"})
+        self.history.append({ "agent": "System", "address": "system", "text": "AI Panel discussion stopped.", "timestamp": datetime.utcnow().isoformat() + "Z", "audioStatus": "failed"})
         self.status = "Idle"
-        self.num_agents = 0
-        self.active_agents_list = []
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
+        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
         await self.broadcast_message({"type": "system_message", "payload": {"text": "Panel stopped."}})
 
         logger.info("Panel stopped (uAgents).")
@@ -546,94 +478,99 @@ class PanelManager:
 panel_manager = PanelManager()
 logger.info("Global PanelManager instance created.")
 
+# --- UAGENTS Agent Handlers ---
 
-# --- UAGENTS Agent Handlers (Add check before sending reply) ---
-
-# Function to clean response (can be global or method)
+# Function to clean response (can be global or method if needed elsewhere)
 def extract_conversation(text: str) -> str:
-    # Basic cleaning, refine as needed
+    # Basic cleaning
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-    # Remove potential leading/trailing quotes if the model adds them
     if cleaned.startswith('"') and cleaned.endswith('"'):
         cleaned = cleaned[1:-1]
+    # Add more cleaning if Ollama adds unwanted prefixes/suffixes
     return cleaned
 
-@saylor_agent.on_message(model=Message, replies=Message)
-async def handle_saylor_message(ctx: Context, sender: str, msg: Message):
-    logger.info(f"Saylor Agent received message from {sender}: '{msg.text[:50]}...'")
-    if not conversation_active:
-        logger.info("Saylor Agent: Conversation inactive, skipping processing.")
-        return
-
-    logger.info("Saylor Agent: Calling PanelManager.get_ollama_response...")
-    response_text = await panel_manager.get_ollama_response(SAYLOR_PROMPT, msg.text, panel_manager.history, ctx.agent.name)
-    cleaned_response = extract_conversation(response_text)
-
-    logger.info("Saylor Agent: Calling PanelManager.handle_agent_response...")
-    # Handle response first (this increments counter and might trigger stop)
-    await panel_manager.handle_agent_response(ctx.agent.name, ctx.agent.address, cleaned_response)
-
-    # Check if the panel is *still* active before sending the reply
-    if conversation_active:
-        logger.info(f"Saylor Agent: Sending response to Schiff Agent ({schiff_agent.address}).")
-        await ctx.send(schiff_agent.address, Message(text=cleaned_response))
-    else:
-        logger.info("Saylor Agent: Panel stopped after handling response, not sending reply.")
-
-
-@schiff_agent.on_message(model=Message, replies=Message)
-async def handle_schiff_message(ctx: Context, sender: str, msg: Message):
-    logger.info(f"Schiff Agent received message from {sender}: '{msg.text[:50]}...'")
-    if not conversation_active:
-        logger.info("Schiff Agent: Conversation inactive, skipping processing.")
-        return
-
-    logger.info("Schiff Agent: Calling PanelManager.get_ollama_response...")
-    response_text = await panel_manager.get_ollama_response(SCHIFF_PROMPT, msg.text, panel_manager.history, ctx.agent.name)
-    cleaned_response = extract_conversation(response_text)
-
-    logger.info("Schiff Agent: Calling PanelManager.handle_agent_response...")
-    # Handle response first (this increments counter and might trigger stop)
-    await panel_manager.handle_agent_response(ctx.agent.name, ctx.agent.address, cleaned_response)
-
-    # Check if the panel is *still* active before sending the reply
-    if conversation_active:
-        logger.info(f"Schiff Agent: Sending response to Saylor Agent ({saylor_agent.address}).")
-        await ctx.send(saylor_agent.address, Message(text=cleaned_response))
-    else:
-        logger.info("Schiff Agent: Panel stopped after handling response, not sending reply.")
-
-
-# Modify startup event slightly to not double-count the first message
-@saylor_agent.on_event("startup")
-async def agent_startup(ctx: Context):
-    agent_name = ctx.agent.name
-    agent_address = ctx.agent.address
-    logger.info(f"{agent_name} ({agent_address}) startup event.")
-
-    # Check panel_manager directly
+# --- Moderator Startup Handler ---
+@kxi_agent.on_event("startup")
+async def kxi_startup(ctx: Context):
+    # This runs when the bureau starts the Kxi agent
+    logger.info(f"Moderator {ctx.agent.name} startup event.")
+    # Check if the panel is intended to be active (via panel_manager)
     if panel_manager.active:
-        # Define the initial topic
-        initial_topic = "Let's debate the true store of value: Bitcoin versus Gold. Peter, gold has history, but isn't Bitcoin superior digital scarcity?"
+        logger.info(f"{ctx.agent.name}: Panel active, getting opening statement...")
+        # Get opening statement/question from Ollama
+        opening_text = await panel_manager.get_ollama_response(ctx.agent.name, panel_manager.history)
 
-        # Log the initial message and handle it via PanelManager (increments counter, triggers TTS)
-        logger.info(f"{agent_name}: Handling initial message via PanelManager: {initial_topic}")
-        await panel_manager.handle_agent_response(agent_name, agent_address, initial_topic)
+        if opening_text.startswith("Error:"):
+             logger.error(f"Moderator failed to get opening: {opening_text}")
+             # Maybe broadcast system error?
+             await panel_manager.handle_single_message("System", f"Error starting conversation: {opening_text}")
+             asyncio.create_task(panel_manager.stop_panel()) # Stop if moderator fails
+             return
 
-        # Check if the panel is still active *after* handling the first response (e.g., if max_messages was 1)
-        # Use panel_manager.active, not conversation_active which might have timing issues here
-        if panel_manager.active:
-            logger.info(f"{agent_name}: Sending initial message to Schiff Agent via ctx.send().")
-            # --- FIX: Use ctx.send() here ---
-            await ctx.send(schiff_agent.address, Message(text=initial_topic))
-            # --- End FIX ---
+        # Handle moderator's own message (adds to history, broadcasts, triggers TTS)
+        proceed = await panel_manager.handle_agent_response(ctx.agent.name, ctx.agent.address, opening_text)
+
+        if proceed and conversation_active:
+             # Send the *opening text* as the first message to the first debater
+             first_debater_address = panel_manager.agent_address_map[DEBATER_AGENTS[0].name]
+             logger.info(f"{ctx.agent.name}: Sending opening message to {DEBATER_AGENTS[0].name} ({first_debater_address})")
+             await ctx.send(first_debater_address, Message(text=opening_text))
         else:
-            logger.info(f"{agent_name}: Panel stopped after handling initial message (max_messages=1?), not sending to Schiff.")
+             logger.warning(f"{ctx.agent.name}: Panel stopped or handler indicated stop after opening message. Not sending to first debater.")
     else:
-        logger.info(f"{agent_name}: Startup event fired, but panel is not active. No initial message sent.")
+        logger.info(f"{ctx.agent.name}: Startup event fired, but panel_manager is not active. No initial message sent.")
 
 
-# --- WebSocket Handler (Stays the same, managed by PanelManager) ---
+# --- Generic Debater Message Handler ---
+async def handle_debater_message(ctx: Context, sender: str, msg: Message, next_agent: Agent):
+    agent_name = ctx.agent.name
+    logger.info(f"Debater {agent_name} received message from {sender}: '{msg.text[:50]}...'")
+    if not conversation_active:
+        logger.info(f"{agent_name}: Conversation inactive, skipping processing.")
+        return
+
+    logger.info(f"{agent_name}: Calling PanelManager.get_ollama_response...")
+    response_text = await panel_manager.get_ollama_response(agent_name, panel_manager.history)
+
+    if response_text.startswith("Error:"):
+        logger.error(f"{agent_name} failed to get response: {response_text}")
+        # Decide how to handle LLM errors - skip turn? broadcast system message?
+        # For now, let's just log and potentially skip sending
+        proceed = await panel_manager.handle_agent_response(agent_name, ctx.agent.address, response_text) # Still log the error message
+        # Maybe don't proceed to next agent on error?
+        proceed = False # Don't send error messages as triggers
+    else:
+        cleaned_response = extract_conversation(response_text)
+        logger.info(f"{agent_name}: Calling PanelManager.handle_agent_response...")
+        # Handle response first (adds to history, broadcasts, triggers TTS, checks limit)
+        proceed = await panel_manager.handle_agent_response(agent_name, ctx.agent.address, cleaned_response)
+
+    # Check if the panel is *still* active and if handler allows proceeding
+    if proceed and conversation_active:
+        next_agent_address = panel_manager.agent_address_map[next_agent.name]
+        logger.info(f"{agent_name}: Sending response to {next_agent.name} ({next_agent_address}).")
+        # Send the *cleaned response* to the next agent
+        await ctx.send(next_agent_address, Message(text=cleaned_response))
+    else:
+        logger.info(f"{agent_name}: Panel stopped or handler indicated stop. Not sending reply to {next_agent.name}.")
+
+
+# --- Assign Handlers Dynamically ---
+for i, current_agent in enumerate(DEBATER_AGENTS):
+    next_agent_index = (i + 1) % len(DEBATER_AGENTS)
+    next_agent = DEBATER_AGENTS[next_agent_index]
+
+    # Need to use a closure or default argument to capture current_agent and next_agent
+    def create_handler(agent_to_reply_to):
+        async def specific_handler(ctx: Context, sender: str, msg: Message):
+            await handle_debater_message(ctx, sender, msg, agent_to_reply_to)
+        return specific_handler
+
+    logger.info(f"Assigning message handler to {current_agent.name}, will reply to {next_agent.name}")
+    current_agent.on_message(model=Message)(create_handler(next_agent))
+
+
+# --- WebSocket Handler (unchanged) ---
 async def websocket_handler(request):
     # global panel_manager # No longer needed
     from aiohttp import web, WSMsgType

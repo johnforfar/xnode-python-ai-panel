@@ -46,7 +46,6 @@ export default function Home() {
   const [backendTest, setBackendTest] = useState<BackendTestResult | null>(
     null
   );
-  const [numAgents, setNumAgents] = useState<number>(2); // For the input field
   const [isLoading, setIsLoading] = useState(false); // Generic loading state for API calls
   const [error, setError] = useState<string | null>(null); // For displaying errors
   // --- Added: WebSocket State ---
@@ -131,11 +130,13 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     try {
-      // Send start request to our Next.js API route
+      // Send start request - no longer need numAgents in body
       const response = await fetch(`/api/panel/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ numAgents: numAgents }),
+        // --- REMOVE body or set to empty object if required by API route ---
+        // body: JSON.stringify({}), // Or simply remove the body property
+        // --- End REMOVE ---
       });
       if (!response.ok) {
         const errorData = await response
@@ -146,7 +147,6 @@ export default function Home() {
         );
       }
       console.log("Panel start request sent");
-      // Fetch status and conversation soon after to reflect changes
       setTimeout(fetchStatus, 300);
       setTimeout(fetchInitialConversation, 500);
     } catch (err: any) {
@@ -381,12 +381,30 @@ export default function Home() {
           console.log("WebSocket message received:", message);
 
           switch (message.type) {
+            // --- ADD Case for conversation_history ---
+            case 'conversation_history':
+              if (Array.isArray(message.payload?.history)) {
+                console.log(`Received full history: ${message.payload.history.length} messages`);
+                setConversation(message.payload.history);
+              } else {
+                console.warn("Received conversation_history but payload.history was not an array:", message.payload);
+              }
+              break;
+            // --- End ADD ---
+
+            // --- ADD Case for moderator_message (handle like agent_message) ---
+            case 'moderator_message':
+              console.log("Handling moderator_message");
+              // Treat moderator message similar to agent message for display
+              setConversation((prev) => [...prev, message.payload]);
+              break;
+            // --- End ADD ---
+
             case 'agent_message':
-              // Payload now includes initial audioStatus: "generating"
+              console.log("Handling agent_message");
               setConversation((prev) => [...prev, message.payload]);
               break;
             case 'audio_update':
-              // Find the message by timestamp and update audio status/URL
               setConversation((prev) =>
                 prev.map((msg) =>
                   msg.timestamp === message.payload.timestamp
@@ -394,11 +412,16 @@ export default function Home() {
                     : msg
                 )
               );
-              // Auto-play logic moved to separate effect
               break;
-            case 'status_update': setPanelStatus(message.payload); break;
-            case 'system_message': setConversation((prev) => [...prev, { agent: "System", address: "system", timestamp: new Date().toISOString(), audioStatus: "failed", ...message.payload }]); break; // System messages can't have audio
-            default: console.warn("Received unknown message type:", message.type);
+            case 'status_update':
+              setPanelStatus(message.payload);
+              break;
+            case 'system_message':
+              setConversation((prev) => [...prev, { agent: "System", address: "system", timestamp: new Date().toISOString(), audioStatus: "failed", ...message.payload }]);
+              break;
+            default:
+              // Keep warning for truly unknown types
+              console.warn(`Received unknown message type: ${message.type}`, message);
           }
         } catch (e) {
           console.error("Failed to parse WebSocket message or invalid format:", event.data, e);
@@ -623,32 +646,13 @@ export default function Home() {
               </p>
               {panelStatus && (
                 <p className="text-xs text-gray-400">
-                  Agents: {panelStatus.num_agents}
+                  Debaters: {panelStatus.num_agents}
                 </p>
               )}
             </div>
 
             {/* Controls */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label htmlFor="numAgents" className="text-sm">
-                  Agents:
-                </label>
-                <input
-                  type="number"
-                  id="numAgents"
-                  value={numAgents}
-                  onChange={(e) =>
-                    setNumAgents(
-                      Math.max(1, Math.min(4, parseInt(e.target.value) || 1))
-                    )
-                  }
-                  min="1"
-                  max="4"
-                  className="w-16 bg-[#1A1A1A] border border-[#454545] rounded px-2 py-1 text-white"
-                  disabled={panelStatus?.active || isLoading}
-                />
-              </div>
               <button
                 onClick={handleStart}
                 disabled={isLoading || panelStatus?.active}

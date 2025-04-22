@@ -13,10 +13,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(n
 logger = logging.getLogger(__name__)
 logger.info("--- app.py: Script Start ---")
 
-# --- Import PanelManager INSTANCE, AGENTS list, and websocket_handler from main.py ---
+# --- Import PanelManager INSTANCE, and websocket_handler from main.py ---
 try:
-    from main import AGENTS, panel_manager, websocket_handler # Import necessary items
-    logger.info("Successfully imported AGENTS, panel_manager instance, and websocket_handler from main.py")
+    from main import panel_manager, websocket_handler # Import only necessary items
+    logger.info("Successfully imported panel_manager instance and websocket_handler from main.py")
 except ImportError as e:
     logger.critical(f"Could not import from main.py. {e}", exc_info=True)
     sys.exit(1)
@@ -53,47 +53,44 @@ async def get_conversation(request):
 
 async def handle_start(request):
     logger.info("POST /api/start")
-    num_agents = 2 # Default
     try:
-        if request.can_read_body and request.content_type == 'application/json':
-            data = await request.json()
-            num_agents_req = data.get('numAgents', 2)
-            # Use len(AGENTS) imported from main
-            if not isinstance(num_agents_req, int) or not 1 <= num_agents_req <= len(AGENTS):
-                 logger.error(f"Invalid numAgents received: {num_agents_req}")
-                 return web.json_response({"error": f"Invalid 'numAgents' (must be 1-{len(AGENTS)})"}, status=400)
-            num_agents = num_agents_req
-        else:
-             logger.info("No valid JSON body for start, using default agents.")
+        if panel_manager.active:
+            logger.warning("Start requested but panel already active.")
+            return web.json_response({"status": "already_active", "message": "Panel is already running."}, status=400)
 
-        # Call panel_manager method (which now starts the Bureau)
-        success = await panel_manager.start_panel(num_agents)
+        success = await panel_manager.start_panel()
         if success:
-            return web.json_response({"status": "Panel starting (uAgents Bureau)"})
+            logger.info("Panel started successfully via API request.")
+            return web.json_response({"status": "started", "message": "Panel started successfully."})
         else:
-            # If start_panel returns False, it means it was already running
-            return web.json_response({"status": "Already running"}, status=400) # Return 400 Bad Request
+            logger.error("PanelManager failed to start.")
+            return web.json_response({"error": "Failed to start panel"}, status=500)
+
     except json.JSONDecodeError:
-         logger.error("Failed to parse JSON body for /api/start")
-         return web.json_response({"error": "Invalid JSON in request body"}, status=400)
+        logger.error("Bad request: Invalid JSON in /api/start")
+        return web.json_response({"error": "Invalid JSON data"}, status=400)
     except Exception as e:
         logger.error(f"Error in handle_start handler: {e}", exc_info=True)
-        return web.json_response({"error": "Failed to start panel"}, status=500)
+        return web.json_response({"error": f"Internal server error: {e}"}, status=500)
 
 
 async def handle_stop(request):
     logger.info("POST /api/stop")
     try:
-        # Call panel_manager method (which now stops the Bureau)
+        if not panel_manager.active:
+            logger.warning("Stop requested but panel not active.")
+            return web.json_response({"status": "already_stopped", "message": "Panel is not running."}, status=400)
+
         success = await panel_manager.stop_panel()
         if success:
-            return web.json_response({"status": "Panel stopping"})
+            logger.info("Panel stopped successfully via API request.")
+            return web.json_response({"status": "stopped", "message": "Panel stopped successfully."})
         else:
-            # If stop_panel returns False, it means it was already stopped
-            return web.json_response({"status": "Already stopped"}, status=400) # Return 400 Bad Request
+            logger.error("PanelManager failed to stop.")
+            return web.json_response({"error": "Failed to stop panel"}, status=500)
     except Exception as e:
         logger.error(f"Error in handle_stop handler: {e}", exc_info=True)
-        return web.json_response({"error": "Failed to stop panel"}, status=500)
+        return web.json_response({"error": f"Internal server error: {e}"}, status=500)
 
 
 # --- Application Setup Function ---
