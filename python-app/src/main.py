@@ -433,7 +433,7 @@ class PanelManager:
         mp3_filepath_str = await self.tts.generate_audio_and_convert(
             text,
             speaker_id,
-            output_dir="static/audio" # Explicitly set output dir relative to src/
+            output_dir="./static/audio" # Explicitly set output dir relative to src/
         )
 
         if mp3_filepath_str:

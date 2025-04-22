@@ -51,10 +51,10 @@ class SesameTTS:
         app_dir = Path(__file__).resolve().parent # Assumes sesame_tts.py is in src/
         if model_dir is None:
             # Default to ../models relative to src/
-            resolved_model_dir = app_dir.parent.parent / "models"
+            resolved_model_dir = app_dir / "models"
         elif not Path(model_dir).is_absolute():
             # Assume relative path is from project root, construct from app_dir
-            resolved_model_dir = app_dir.parent.parent / model_dir
+            resolved_model_dir = app_dir / model_dir
         else:
             resolved_model_dir = Path(model_dir)
         logger.info(f"SesameTTS resolved model directory to: {resolved_model_dir}")
@@ -92,15 +92,14 @@ class SesameTTS:
             self.tts_available = False
             logger.warning(f"Using fallback (silent) audio generation due to initialization error.")
 
-    async def generate_audio_and_convert(self, text, speaker_id=0, output_dir="static/audio"):
+    async def generate_audio_and_convert(self, text, speaker_id=0, output_dir="./static/audio"):
         """Generates audio, saves as temp WAV, converts to MP3, deletes WAV, returns MP3 path."""
         if not self.tts_available or self.generator is None:
             logger.warning("TTS not available/loaded, skipping audio generation.")
             return None
 
         temp_wav_file_path = None # Define variable outside try
-        app_dir = Path(__file__).resolve().parent # Get current dir (src/)
-        abs_output_dir = app_dir / output_dir # Create absolute path for output
+        abs_output_dir = output_dir # Create absolute path for output
         abs_output_dir.mkdir(parents=True, exist_ok=True) # Ensure dir exists
 
         try:
@@ -168,7 +167,7 @@ if __name__ == "__main__":
     async def main():
          print("Running SesameTTS direct test...")
          # Assume models are in ../models relative to this script's location (src/)
-         model_path = Path(__file__).resolve().parent.parent / "models"
+         model_path = Path(__file__).resolve() / "models"
          print(f"Looking for models in: {model_path}")
          tts = SesameTTS(device="cpu", model_dir=str(model_path))
          if tts.tts_available:
