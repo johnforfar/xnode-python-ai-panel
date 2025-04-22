@@ -92,6 +92,17 @@ in
         Group = "ai-panel-backend";
         WorkingDirectory = "/ai-panel-data";
         Restart = "on-failure";
+        DeviceAllow = [
+          # CUDA
+          # https://docs.nvidia.com/dgx/pdf/dgx-os-5-user-guide.pdf
+          "char-nvidiactl"
+          "char-nvidia-caps"
+          "char-nvidia-frontend"
+          "char-nvidia-uvm"
+          # ROCm
+          "char-drm"
+          "char-kfd"
+        ];
       };
     };
 
