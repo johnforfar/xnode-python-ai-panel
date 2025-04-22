@@ -186,7 +186,7 @@ class PanelManager:
         logger.info(f"Attempting to initialize SesameTTS class on device: {self.tts_device}")
 
         # --- Define the path to your LOCAL model directory ---
-        local_model_base_path = Path(app_dir).parent.parent / "models"
+        local_model_base_path = Path(app_dir).parent / "src/models"
 
         try:
              # --- Instantiate SesameTTS (which now internally calls load_csm_1b_local) ---
