@@ -62,7 +62,8 @@ class Generator:
                 logger.info(f"CPU detected. Setting cache dtype to: {cache_dtype}")
             else: # CUDA
                 # Use bfloat16 if supported, otherwise float16
-                cache_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+                # RuntimeError: Index put requires the source and destination dtypes match
+                cache_dtype = torch.float32 # torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
                 logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype}")
             # --- End FIX ---
 
