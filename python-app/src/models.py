@@ -78,6 +78,8 @@ def _prepare_transformer(model):
         # We might need to get embed_dim differently if tok_embeddings isn't there
         embed_dim = model.embed_dim # Assuming it's directly accessible
     model.output = nn.Identity()
+    if torch.cuda.is_available():
+        model.to("cuda")
     return model, embed_dim
 
 def _create_causal_mask(seq_len: int, device: torch.device):
