@@ -267,7 +267,7 @@ class Generator:
 
 
         max_generation_len = int(max_audio_length_ms / 80)
-        max_seq_len = self._model.config.max_seq_len
+        max_seq_len = 2048 # self._model.config.max_seq_len (AttributeError: 'ModelArgs' object has no attribute 'max_seq_len')
 
         # --- Tokenization logic ---
         logger.debug("Tokenizing context and text...")
