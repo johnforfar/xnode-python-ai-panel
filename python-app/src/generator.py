@@ -22,19 +22,8 @@ os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 try:
     from models import PROJECT_ROOT
 except ImportError:
-    PROJECT_ROOT = Path(__file__).parent.parent.parent
+    PROJECT_ROOT = Path(__file__).parent
 print(f"INFO: [generator.py] PROJECT_ROOT set to: {PROJECT_ROOT}")
-
-# --- Define project root path within generator.py as well ---
-# Needed to construct the local model path
-try:
-    GEN_APP_DIR = Path(__file__).resolve().parent
-    GEN_PROJECT_ROOT = GEN_APP_DIR.parent.parent
-except NameError:
-    # Fallback if __file__ isn't defined (e.g., interactive session)
-    GEN_PROJECT_ROOT = Path('.').resolve().parent.parent
-    print("Warning: __file__ not defined, assuming standard project structure.")
-# --- End project root definition ---
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +137,7 @@ class Generator:
         Loads the Llama-3.2-1B tokenizer, prioritizing a local path.
         """
         # Define the expected local path
-        local_tokenizer_path = GEN_PROJECT_ROOT / "models" / "llama-3-2-1b"
+        local_tokenizer_path = PROJECT_ROOT / "src" / "models" / "llama-3-2-1b"
         hub_identifier = "unsloth/Llama-3.2-1B" # Or meta-llama/Meta-Llama-3.1-8B-Instruct
 
         tokenizer = None

@@ -51,7 +51,7 @@ class SesameTTS:
         app_dir = Path(__file__).resolve().parent # Assumes sesame_tts.py is in src/
         if model_dir is None:
             # Default to ../models relative to src/
-            resolved_model_dir = app_dir / "models"
+            resolved_model_dir = app_dir / "src/models"
         elif not Path(model_dir).is_absolute():
             # Assume relative path is from project root, construct from app_dir
             resolved_model_dir = app_dir / model_dir
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     async def main():
          print("Running SesameTTS direct test...")
          # Assume models are in ../models relative to this script's location (src/)
-         model_path = Path(__file__).resolve() / "models"
+         model_path = Path(__file__).resolve() / "src/models"
          print(f"Looking for models in: {model_path}")
          tts = SesameTTS(device="cpu", model_dir=str(model_path))
          if tts.tts_available:

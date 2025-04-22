@@ -17,7 +17,7 @@ except ImportError:
     raise
 
 # Define PROJECT_ROOT for potential use in loading
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent
 logger = logging.getLogger(__name__)
 logger.info(f"INFO: [models.py] PROJECT_ROOT set to: {PROJECT_ROOT}")
 
