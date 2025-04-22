@@ -56,26 +56,28 @@ class Generator:
 
         # Setup caches ONCE during initialization
         try:
-            # --- FIX: Determine Cache dtype based on device ---
+            # --- FIX: Revert Cache dtype logic for CUDA ---
             if self.device.type == 'cpu':
                 cache_dtype = torch.float32 # Use float32 for CPU cache
                 logger.info(f"CPU detected. Setting cache dtype to: {cache_dtype}")
             else: # CUDA
-                # Use bfloat16 if supported, otherwise float16
-                # RuntimeError: Index put requires the source and destination dtypes match
-                cache_dtype = torch.float32 # torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-                logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype}")
+                # Use bfloat16 if supported, otherwise float16 (more standard for GPU)
+                if torch.cuda.is_bf16_supported():
+                    cache_dtype = torch.bfloat16
+                    logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype} (bf16 supported)")
+                else:
+                    cache_dtype = torch.float16
+                    logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype} (bf16 NOT supported)")
             # --- End FIX ---
 
             logger.debug(f"Setting up model caches during Generator init (batch_size=1, device={self.device}, dtype={cache_dtype})...")
-            # Ensure model is on the correct device before setting up caches
             self._model.to(self.device)
-            # Pass the correctly determined dtype
+            # Pass the potentially changed dtype
             self._model.setup_caches(max_batch_size=1, dtype=cache_dtype)
             logger.debug(f"Model caches setup successfully during init.")
         except Exception as e:
              logger.error(f"Error setting up caches during Generator init: {e}", exc_info=True)
-             # Depending on severity, you might want to raise this or handle differently
+             # Consider re-raising or handling more gracefully if setup fails
 
         logger.debug("Loading text tokenizer (Llama)...")
         self._text_tokenizer = self.load_llama3_tokenizer()
