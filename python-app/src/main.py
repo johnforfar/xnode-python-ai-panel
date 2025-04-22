@@ -12,10 +12,10 @@ import json
 import aiohttp
 import torch
 import random
+from env import models_dir, data_dir
 
 # --- Set Hugging Face Cache Environment Variables EARLY ---
-PROJECT_ROOT_ENV = Path(app_dir).parent.parent # Get project root reliably
-MODELS_DIR_ENV = PROJECT_ROOT_ENV / "models"
+MODELS_DIR_ENV = Path(models_dir())
 MODELS_DIR_ENV.mkdir(exist_ok=True) # Ensure the base /models directory exists
 os.environ["HF_HOME"] = str(MODELS_DIR_ENV)
 os.environ["HUGGINGFACE_HUB_CACHE"] = str(MODELS_DIR_ENV)
@@ -27,7 +27,7 @@ print(f"INFO: HF_HOME/HUGGINGFACE_HUB_CACHE/TRANSFORMERS_CACHE set to: {MODELS_D
 # --- End Environment Variable Setup ---
 
 # --- Logging Setup (Keep as is) ---
-LOG_FILE = "./logs.txt"
+LOG_FILE = data_dir() / "logs.txt"
 try:
     with open(LOG_FILE, 'w') as f: f.write("--- Log Start ---\n")
     file_handler = logging.FileHandler(LOG_FILE, mode='a')
@@ -136,7 +136,7 @@ class PanelManager:
         # --- Initialize TTS ---
         self.tts_device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Attempting to initialize SesameTTS class on device: {self.tts_device}")
-        local_model_base_path = Path(app_dir).parent.parent / "models"
+        local_model_base_path = Path(models_dir())
         try:
             logger.info(f"Instantiating SesameTTS, targeting model path: {local_model_base_path} and device: {self.tts_device}")
             self.tts = SesameTTS(device=self.tts_device, model_dir=str(local_model_base_path))
@@ -356,7 +356,7 @@ class PanelManager:
         mp3_filepath_str = await self.tts.generate_audio_and_convert(
             text,
             speaker_id,
-            output_dir="static/audio" # Explicitly set output dir relative to src/
+            output_dir="static/audio"
         )
 
         if mp3_filepath_str:
@@ -364,7 +364,7 @@ class PanelManager:
             # Convert absolute filepath to relative URL path for frontend
             try:
                 # --- Create URL relative to the static serving directory ---
-                static_dir = Path(app_dir) / "static" # Base static dir
+                static_dir = data_dir() / "static" # Base static dir
                 relative_path = mp3_filepath.relative_to(static_dir)
                 # Ensure forward slashes for URL, add leading slash
                 audio_url = "/" + relative_path.as_posix()

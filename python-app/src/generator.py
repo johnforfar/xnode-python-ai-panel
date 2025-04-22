@@ -14,27 +14,10 @@ from subprocess import run
 from huggingface_hub import hf_hub_download
 from collections import OrderedDict
 import time # Ensure time is imported for timing
+from env import models_dir
 
 # Force CPU usage for all operations
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-
-# Use PROJECT_ROOT defined in models.py or redefine if needed
-try:
-    from models import PROJECT_ROOT
-except ImportError:
-    PROJECT_ROOT = Path(__file__).parent.parent.parent
-print(f"INFO: [generator.py] PROJECT_ROOT set to: {PROJECT_ROOT}")
-
-# --- Define project root path within generator.py as well ---
-# Needed to construct the local model path
-try:
-    GEN_APP_DIR = Path(__file__).resolve().parent
-    GEN_PROJECT_ROOT = GEN_APP_DIR.parent.parent
-except NameError:
-    # Fallback if __file__ isn't defined (e.g., interactive session)
-    GEN_PROJECT_ROOT = Path('.').resolve().parent.parent
-    print("Warning: __file__ not defined, assuming standard project structure.")
-# --- End project root definition ---
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +131,7 @@ class Generator:
         Loads the Llama-3.2-1B tokenizer, prioritizing a local path.
         """
         # Define the expected local path
-        local_tokenizer_path = GEN_PROJECT_ROOT / "models" / "llama-3-2-1b"
+        local_tokenizer_path = models_dir() / "llama-3-2-1b"
         hub_identifier = "unsloth/Llama-3.2-1B" # Or meta-llama/Meta-Llama-3.1-8B-Instruct
 
         tokenizer = None

@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
+from env import data_dir
 
 # Force CPU usage for all operations
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="AI Panel Discussion")
 
 # Get the current directory
-current_dir = Path(__file__).parent
+current_dir = Path(data_dir())
 static_dir = current_dir / "static"
 templates_dir = current_dir / "templates"
 audio_dir = Path("audio_outputs")

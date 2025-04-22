@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import os
 import sys
+from env import models_dir as models_dir_env
 
 def check_models():
-    models_dir = "/models"
+    models_dir = models_dir_env()
     
     # Check if models directory exists
     if not os.path.exists(models_dir):

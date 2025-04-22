@@ -82,6 +82,8 @@ in
         #  DB_PASS = "game";
         SECRET = cfg.secret;
         LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+        MODELSDIR = "/models";
+        DATADIR = "/ai-panel-data";
       };
       serviceConfig = {
         ExecStart = "${lib.getExe xnode-python-ai-panel-backend}";

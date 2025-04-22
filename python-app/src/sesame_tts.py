@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 import time # Use time module for perf_counter
 from typing import Tuple
+from env import models_dir, data_dir
 
 # --- Use the local loader ---
 from generator import load_csm_1b_local
@@ -48,15 +49,7 @@ class SesameTTS:
         # os.environ["NO_TORCH_COMPILE"] = "1" # May not be needed if generator doesn't compile
 
         # --- Resolve model directory (relative to src/ where main.py/app.py run) ---
-        app_dir = Path(__file__).resolve().parent # Assumes sesame_tts.py is in src/
-        if model_dir is None:
-            # Default to ../models relative to src/
-            resolved_model_dir = app_dir.parent.parent / "models"
-        elif not Path(model_dir).is_absolute():
-            # Assume relative path is from project root, construct from app_dir
-            resolved_model_dir = app_dir.parent.parent / model_dir
-        else:
-            resolved_model_dir = Path(model_dir)
+        resolved_model_dir = Path(model_dir())
         logger.info(f"SesameTTS resolved model directory to: {resolved_model_dir}")
         # --- End Resolve ---
 
@@ -99,8 +92,7 @@ class SesameTTS:
             return None
 
         temp_wav_file_path = None # Define variable outside try
-        app_dir = Path(__file__).resolve().parent # Get current dir (src/)
-        abs_output_dir = app_dir / output_dir # Create absolute path for output
+        abs_output_dir = data_dir() / output_dir # Create absolute path for output
         abs_output_dir.mkdir(parents=True, exist_ok=True) # Ensure dir exists
 
         try:
@@ -168,7 +160,7 @@ if __name__ == "__main__":
     async def main():
          print("Running SesameTTS direct test...")
          # Assume models are in ../models relative to this script's location (src/)
-         model_path = Path(__file__).resolve().parent.parent / "models"
+         model_path = Path(models_dir())
          print(f"Looking for models in: {model_path}")
          tts = SesameTTS(device="cpu", model_dir=str(model_path))
          if tts.tts_available:
