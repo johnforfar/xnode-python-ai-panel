@@ -249,82 +249,76 @@ class Generator:
         topk: int = 50,
     ):
         start_time_generate = time.perf_counter()
-        # --- Use the stored device attribute ---
         target_device = self.device
         logger.debug(f"Entering Generator.generate for speaker {speaker} on device {target_device} text: {text[:30]}...")
-        # --- End Use ---
 
-        # --- Reset KV Cache ---
-        if hasattr(self._model, "reset_kv_cache"):
-            logger.debug("Resetting model KV cache.")
-            self._model.reset_kv_cache()
-        else:
-             logger.warning("Model does not have 'reset_kv_cache' method.")
-
-        # ... (Clear CUDA cache - maybe conditional on device?) ...
         if target_device == "cuda":
             torch.cuda.empty_cache()
 
-
         max_generation_len = int(max_audio_length_ms / 80)
-        max_seq_len = 2048 # self._model.config.max_seq_len (AttributeError: 'ModelArgs' object has no attribute 'max_seq_len')
+        max_seq_len = 2048 # Set based on Llama-3.2-1B backbone config
 
         # --- Tokenization logic ---
         logger.debug("Tokenizing context and text...")
         tokens_segments: List[Tuple[torch.Tensor, torch.Tensor]] = []
         try:
+             # Tokenize context segments
              tokens_segments = [self._tokenize_segment(s) for s in context]
+             # Tokenize the current text segment
              tokens_segments.append(self._tokenize_text_segment(text, speaker))
+             logger.debug(f"Tokenized {len(tokens_segments)} segments.")
         except Exception as token_e:
              logger.error(f"Error during tokenization: {token_e}", exc_info=True)
              return torch.tensor([]) # Return empty tensor on tokenization error
 
-        # --- Stack tokens (potentially on CPU) ---
-        try:
-            # Ensure stack_tokens can handle potential empty lists if context fails etc.
-            if not tokens_segments:
-                 logger.warning("No token segments to stack.")
-                 prompt_tokens = torch.empty((0, self._model.config.audio_num_codebooks + 1), dtype=torch.long)
-                 prompt_tokens_mask = torch.empty((0, self._model.config.audio_num_codebooks + 1), dtype=torch.bool)
-            else:
-                 prompt_tokens, prompt_tokens_mask = self._stack_tokens(tokens_segments, max_seq_len - 1) # -1 for BOS?
-        except Exception as stack_e:
-             logger.error(f"Error stacking tokens: {stack_e}", exc_info=True)
-             return torch.tensor([])
+        # --- FIX: Replace _stack_tokens with direct concatenation ---
+        # Initialize empty tensors on the target device
+        prompt_tokens = torch.empty((0, self._model.config.audio_num_codebooks + 1), dtype=torch.long, device=target_device)
+        prompt_tokens_mask = torch.empty((0, self._model.config.audio_num_codebooks + 1), dtype=torch.bool, device=target_device)
 
-        # --- FIX: Ensure prompt tensors are explicitly moved to the target device ---
         try:
-            logger.debug(f"Moving prompt tensors (shape: {prompt_tokens.shape}) from {prompt_tokens.device} to {target_device}")
+            if tokens_segments: # Check if there are any segments to concatenate
+                 logger.debug("Concatenating token segments...")
+                 # Concatenate tensors from the list of tuples
+                 all_segment_tokens = [seg[0] for seg in tokens_segments]
+                 all_segment_masks = [seg[1] for seg in tokens_segments]
+                 prompt_tokens = torch.cat(all_segment_tokens, dim=0)
+                 prompt_tokens_mask = torch.cat(all_segment_masks, dim=0)
+                 logger.debug(f"Concatenated tokens shape: {prompt_tokens.shape}")
+            else:
+                logger.warning("No token segments found after tokenization.")
+
+            # Ensure tensors are on the correct device (might be redundant but safe)
             prompt_tokens = prompt_tokens.to(target_device)
             prompt_tokens_mask = prompt_tokens_mask.to(target_device)
-            logger.debug("Prompt tensors moved successfully.")
-        except Exception as move_e:
-            logger.error(f"Failed to move prompt tensors to device {target_device}: {move_e}", exc_info=True)
-            return torch.tensor([])
+
+        except Exception as concat_e:
+             logger.error(f"Error concatenating token segments: {concat_e}", exc_info=True)
+             return torch.tensor([])
         # --- End FIX ---
 
-
-        # --- Add BOS ---
-        # It's generally safer to create tensors directly on the target device
+        # --- FIX: Correct BOS token logic ---
         bos_frame = torch.zeros(1, self._model.config.audio_num_codebooks + 1, dtype=torch.long, device=target_device)
         bos_frame_mask = torch.zeros(1, self._model.config.audio_num_codebooks + 1, dtype=torch.bool, device=target_device)
-        if hasattr(self._model, "bos_id"):
+        # Check tokenizer for BOS ID
+        if self._text_tokenizer and hasattr(self._text_tokenizer, 'bos_token_id') and self._text_tokenizer.bos_token_id is not None:
+             bos_id = self._text_tokenizer.bos_token_id
              # Assuming bos_id applies to the last dimension (text token)
-             bos_frame[0, -1] = self._model.bos_id
+             bos_frame[0, -1] = bos_id
              bos_frame_mask[0, -1] = True
+             # Prepend the created BOS frame
              prompt_tokens = torch.cat((bos_frame, prompt_tokens), dim=0)
              prompt_tokens_mask = torch.cat((bos_frame_mask, prompt_tokens_mask), dim=0)
-             logger.debug(f"Prepended BOS. New prompt shape: {prompt_tokens.shape}")
+             logger.debug(f"Prepended BOS token (ID: {bos_id}). New prompt shape: {prompt_tokens.shape}")
         else:
-             logger.warning("Model does not have bos_id, cannot prepend BOS frame.")
-        # --- End Add BOS ---
+             logger.warning("Text tokenizer does not have bos_token_id, cannot prepend BOS frame.")
+        # --- End FIX ---
 
-        # Check max_seq_len again AFTER adding BOS and handle truncation if needed
+        # Check max_seq_len again AFTER concatenation and BOS and handle truncation if needed
         if prompt_tokens.size(0) > max_seq_len:
              logger.warning(f"Prompt length ({prompt_tokens.size(0)}) exceeds max_seq_len ({max_seq_len}). Truncating.")
              prompt_tokens = prompt_tokens[-max_seq_len:]
              prompt_tokens_mask = prompt_tokens_mask[-max_seq_len:]
-
 
         # --- Generation Loop ---
         samples = []
