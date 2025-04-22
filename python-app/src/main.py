@@ -441,7 +441,7 @@ class PanelManager:
             # Convert absolute filepath to relative URL path for frontend
             try:
                 # --- Create URL relative to the static serving directory ---
-                static_dir = Path(app_dir) / "static" # Base static dir
+                static_dir = "./static" # Base static dir
                 relative_path = mp3_filepath.relative_to(static_dir)
                 # Ensure forward slashes for URL, add leading slash
                 audio_url = "/" + relative_path.as_posix()
