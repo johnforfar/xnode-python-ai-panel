@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 import time # Use time module for perf_counter
 from typing import Tuple
-from env import models_dir, data_dir
+from env import models_dir as models_dir_env, data_dir
 
 # --- Use the local loader ---
 from generator import load_csm_1b_local
@@ -49,7 +49,7 @@ class SesameTTS:
         # os.environ["NO_TORCH_COMPILE"] = "1" # May not be needed if generator doesn't compile
 
         # --- Resolve model directory (relative to src/ where main.py/app.py run) ---
-        resolved_model_dir = Path(model_dir())
+        resolved_model_dir = Path(models_dir_env())
         logger.info(f"SesameTTS resolved model directory to: {resolved_model_dir}")
         # --- End Resolve ---
 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
     async def main():
          print("Running SesameTTS direct test...")
          # Assume models are in ../models relative to this script's location (src/)
-         model_path = Path(models_dir())
+         model_path = Path(models_dir_env())
          print(f"Looking for models in: {model_path}")
          tts = SesameTTS(device="cpu", model_dir=str(model_path))
          if tts.tts_available:
