@@ -92,7 +92,7 @@ class SesameTTS:
             return None
 
         temp_wav_file_path = None # Define variable outside try
-        abs_output_dir = data_dir() / output_dir # Create absolute path for output
+        abs_output_dir = Path(data_dir()) / output_dir # Create absolute path for output
         abs_output_dir.mkdir(parents=True, exist_ok=True) # Ensure dir exists
 
         try:

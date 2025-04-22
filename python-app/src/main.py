@@ -27,7 +27,7 @@ print(f"INFO: HF_HOME/HUGGINGFACE_HUB_CACHE/TRANSFORMERS_CACHE set to: {MODELS_D
 # --- End Environment Variable Setup ---
 
 # --- Logging Setup (Keep as is) ---
-LOG_FILE = data_dir() / "logs.txt"
+LOG_FILE = Path(data_dir()) / "logs.txt"
 try:
     with open(LOG_FILE, 'w') as f: f.write("--- Log Start ---\n")
     file_handler = logging.FileHandler(LOG_FILE, mode='a')
@@ -364,7 +364,7 @@ class PanelManager:
             # Convert absolute filepath to relative URL path for frontend
             try:
                 # --- Create URL relative to the static serving directory ---
-                static_dir = data_dir() / "static" # Base static dir
+                static_dir = Path(data_dir()) / "static" # Base static dir
                 relative_path = mp3_filepath.relative_to(static_dir)
                 # Ensure forward slashes for URL, add leading slash
                 audio_url = "/" + relative_path.as_posix()

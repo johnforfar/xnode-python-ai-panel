@@ -131,7 +131,7 @@ class Generator:
         Loads the Llama-3.2-1B tokenizer, prioritizing a local path.
         """
         # Define the expected local path
-        local_tokenizer_path = models_dir() / "llama-3-2-1b"
+        local_tokenizer_path = Path(models_dir()) / "llama-3-2-1b"
         hub_identifier = "unsloth/Llama-3.2-1B" # Or meta-llama/Meta-Llama-3.1-8B-Instruct
 
         tokenizer = None

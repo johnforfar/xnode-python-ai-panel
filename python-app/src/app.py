@@ -122,7 +122,7 @@ def setup_routes(app):
 
     # --- ADD STATIC ROUTE FOR AUDIO FILES ---
     # Determine the path relative to this script's location
-    static_audio_path = data_dir() / 'static' / 'audio'
+    static_audio_path = Path(data_dir()) / 'static' / 'audio'
     # Ensure the directory exists (optional, but good practice)
     static_audio_path.mkdir(parents=True, exist_ok=True)
     app.router.add_static('/audio', path=str(static_audio_path), name='audio', show_index=False) # Set show_index=False

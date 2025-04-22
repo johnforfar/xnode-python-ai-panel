@@ -9,12 +9,13 @@ import glob
 import subprocess
 import tempfile
 from typing import Tuple
+from env import models_dir
 
 # --- Setup Project Paths relative to THIS script ---
 SCRIPT_DIR = Path(__file__).resolve().parent # Should be python-app/src/tests/
 SRC_DIR = SCRIPT_DIR.parent                 # Should be python-app/src/
 PROJECT_ROOT = SRC_DIR.parent.parent        # Should be project root
-MODELS_DIR = PROJECT_ROOT / "models"
+MODELS_DIR = Path(models_dir())
 OUTPUT_DIR = SCRIPT_DIR                     # Save output WAV/MP3 in the same tests/ directory
 
 print(f"INFO: Project Root: {PROJECT_ROOT}")
