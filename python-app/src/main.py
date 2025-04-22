@@ -13,7 +13,7 @@ import aiohttp
 import torch
 
 # --- Set Hugging Face Cache Environment Variables EARLY ---
-PROJECT_ROOT_ENV = Path(app_dir).parent.parent # Get project root reliably
+PROJECT_ROOT_ENV = Path(app_dir) # Get project root reliably
 MODELS_DIR_ENV = PROJECT_ROOT_ENV / "models"
 MODELS_DIR_ENV.mkdir(exist_ok=True) # Ensure the base /models directory exists
 os.environ["HF_HOME"] = str(MODELS_DIR_ENV)
