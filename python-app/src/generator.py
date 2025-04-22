@@ -203,13 +203,9 @@ class Generator:
             num_codebooks = self._model.config.audio_num_codebooks
             if audio_codes.size(0) != num_codebooks:
                  logger.warning(f"Mimi produced {audio_codes.size(0)} codebooks, but model expects {num_codebooks}. Using expected number.")
-                 # Adjust if needed, or error? Let's assume model expects fixed size.
-                 # This might need revisiting if Mimi's output varies unexpectedly.
                  if audio_codes.size(0) > num_codebooks:
                      audio_codes = audio_codes[:num_codebooks, :]
-                 else: # Pad if fewer? Unlikely with encode.
-                     # Handle padding case if necessary, for now assume >= expected
-                     pass
+                 # else: Handle padding if necessary
 
             # Add EOS frame (column of zeros)
             eos_frame = torch.zeros(num_codebooks, 1, device=self.device, dtype=audio_codes.dtype)
@@ -224,9 +220,9 @@ class Generator:
             audio_frame = torch.zeros(num_frames, frame_size, dtype=torch.long, device=self.device)
             audio_frame_mask = torch.zeros(num_frames, frame_size, dtype=torch.bool, device=self.device)
 
-            # Place audio tokens - original placed in [:, :-1], let's match that
-            audio_frame[:, :-1] = audio_tokens_t # Place K codebooks in first 32 slots
-            audio_frame_mask[:, :-1] = True      # Mask those slots
+            # Place audio tokens
+            audio_frame[:, :-1] = audio_tokens_t
+            audio_frame_mask[:, :-1] = True
 
             return audio_frame, audio_frame_mask
          except Exception as e:
@@ -253,100 +249,140 @@ class Generator:
         topk: int = 50,
     ):
         start_time_generate = time.perf_counter()
-        logger.debug(f"Entering Generator.generate (Original Logic) for speaker {speaker} text: {text[:30]}...")
+        # --- Use the stored device attribute ---
+        target_device = self.device
+        logger.debug(f"Entering Generator.generate for speaker {speaker} on device {target_device} text: {text[:30]}...")
+        # --- End Use ---
 
-        # --- Reset KV Cache (as per original) ---
-        if hasattr(self._model, 'reset_caches'):
-            self._model.reset_caches()
+        # --- Reset KV Cache ---
+        if hasattr(self._model, "reset_kv_cache"):
+            logger.debug("Resetting model KV cache.")
+            self._model.reset_kv_cache()
         else:
-            logger.warning("Model does not have reset_caches method.")
-        # --- End Reset ---
+             logger.warning("Model does not have 'reset_kv_cache' method.")
 
-        if torch.cuda.is_available() and self.device.type == 'cuda': # Check if using CUDA
-            logger.debug("Clearing CUDA cache before generation.")
-            torch.cuda.empty_cache() # Keep cache clearing
+        # ... (Clear CUDA cache - maybe conditional on device?) ...
+        if target_device == "cuda":
+            torch.cuda.empty_cache()
+
 
         max_generation_len = int(max_audio_length_ms / 80)
-        tokens, tokens_mask = [], []
+        max_seq_len = self._model.config.max_seq_len
 
-        # ... (Tokenization logic - unchanged) ...
-        logger.debug("Tokenizing context and input text...")
-        for segment in context:
-            segment_tokens, segment_tokens_mask = self._tokenize_segment(segment)
-            tokens.append(segment_tokens)
-            tokens_mask.append(segment_tokens_mask)
+        # --- Tokenization logic ---
+        logger.debug("Tokenizing context and text...")
+        tokens_segments: List[Tuple[torch.Tensor, torch.Tensor]] = []
+        try:
+             tokens_segments = [self._tokenize_segment(s) for s in context]
+             tokens_segments.append(self._tokenize_text_segment(text, speaker))
+        except Exception as token_e:
+             logger.error(f"Error during tokenization: {token_e}", exc_info=True)
+             return torch.tensor([]) # Return empty tensor on tokenization error
 
-        gen_segment_tokens, gen_segment_tokens_mask = self._tokenize_text_segment(text, speaker)
-        tokens.append(gen_segment_tokens)
-        tokens_mask.append(gen_segment_tokens_mask)
+        # --- Stack tokens (potentially on CPU) ---
+        try:
+            # Ensure stack_tokens can handle potential empty lists if context fails etc.
+            if not tokens_segments:
+                 logger.warning("No token segments to stack.")
+                 prompt_tokens = torch.empty((0, self._model.config.audio_num_codebooks + 1), dtype=torch.long)
+                 prompt_tokens_mask = torch.empty((0, self._model.config.audio_num_codebooks + 1), dtype=torch.bool)
+            else:
+                 prompt_tokens, prompt_tokens_mask = self._stack_tokens(tokens_segments, max_seq_len - 1) # -1 for BOS?
+        except Exception as stack_e:
+             logger.error(f"Error stacking tokens: {stack_e}", exc_info=True)
+             return torch.tensor([])
 
-        prompt_tokens = torch.cat(tokens, dim=0).long().to(self.device)
-        prompt_tokens_mask = torch.cat(tokens_mask, dim=0).bool().to(self.device)
+        # --- FIX: Ensure prompt tensors are explicitly moved to the target device ---
+        try:
+            logger.debug(f"Moving prompt tensors (shape: {prompt_tokens.shape}) from {prompt_tokens.device} to {target_device}")
+            prompt_tokens = prompt_tokens.to(target_device)
+            prompt_tokens_mask = prompt_tokens_mask.to(target_device)
+            logger.debug("Prompt tensors moved successfully.")
+        except Exception as move_e:
+            logger.error(f"Failed to move prompt tensors to device {target_device}: {move_e}", exc_info=True)
+            return torch.tensor([])
+        # --- End FIX ---
 
-        max_seq_len = 2048 # Or self.max_seq_len if defined
+
+        # --- Add BOS ---
+        # It's generally safer to create tensors directly on the target device
+        bos_frame = torch.zeros(1, self._model.config.audio_num_codebooks + 1, dtype=torch.long, device=target_device)
+        bos_frame_mask = torch.zeros(1, self._model.config.audio_num_codebooks + 1, dtype=torch.bool, device=target_device)
+        if hasattr(self._model, "bos_id"):
+             # Assuming bos_id applies to the last dimension (text token)
+             bos_frame[0, -1] = self._model.bos_id
+             bos_frame_mask[0, -1] = True
+             prompt_tokens = torch.cat((bos_frame, prompt_tokens), dim=0)
+             prompt_tokens_mask = torch.cat((bos_frame_mask, prompt_tokens_mask), dim=0)
+             logger.debug(f"Prepended BOS. New prompt shape: {prompt_tokens.shape}")
+        else:
+             logger.warning("Model does not have bos_id, cannot prepend BOS frame.")
+        # --- End Add BOS ---
+
+        # Check max_seq_len again AFTER adding BOS and handle truncation if needed
         if prompt_tokens.size(0) > max_seq_len:
-            logger.warning(f"Prompt length ({prompt_tokens.size(0)}) exceeds max_seq_len ({max_seq_len}). Truncating.")
-            prompt_tokens = prompt_tokens[-max_seq_len:]
-            prompt_tokens_mask = prompt_tokens_mask[-max_seq_len:]
+             logger.warning(f"Prompt length ({prompt_tokens.size(0)}) exceeds max_seq_len ({max_seq_len}). Truncating.")
+             prompt_tokens = prompt_tokens[-max_seq_len:]
+             prompt_tokens_mask = prompt_tokens_mask[-max_seq_len:]
 
-        # --- Generation Loop (Reverted to Original Sesame Logic) ---
+
+        # --- Generation Loop ---
         samples = []
-        # Initial inputs for the loop
-        curr_tokens = prompt_tokens.unsqueeze(0)
-        curr_tokens_mask = prompt_tokens_mask.unsqueeze(0)
-        # Global position tracker
-        curr_pos = torch.arange(0, prompt_tokens.size(0), device=self.device).unsqueeze(0).long()
+        # Ensure curr_tokens and mask start on the correct device
+        curr_tokens = prompt_tokens.unsqueeze(0).to(target_device) # Redundant .to() is safe
+        curr_tokens_mask = prompt_tokens_mask.unsqueeze(0).to(target_device) # Redundant .to() is safe
+        # Ensure curr_pos is created on the correct device
+        curr_pos = torch.arange(0, prompt_tokens.size(0), device=target_device).unsqueeze(0).long()
 
-        logger.debug(f"Starting frame generation loop (Original Logic, max_len={max_generation_len})...")
+        MIN_FRAMES_BEFORE_TERMINATION = 25
+        logger.debug(f"Starting frame generation loop (max_len={max_generation_len}, min_frames={MIN_FRAMES_BEFORE_TERMINATION})...")
         log_interval = 20
         start_time_loop = time.perf_counter()
 
         for i in range(max_generation_len):
-            # loop_iter_start = time.perf_counter() # Optional detailed timing
             try:
-                # Generate the next frame using current tokens, masks, and positions
-                # generate_frame uses KV cache internally based on input_pos
+                # --- Ensure model and inputs are on the same device before call ---
+                # (Model should already be on target_device from loading)
+                # (curr_tokens, mask, pos are confirmed/moved above or created on target_device)
                 sample = self._model.generate_frame(curr_tokens, curr_tokens_mask, curr_pos, temperature, topk)
-                # sample shape: [B, 32] (num_codebooks)
 
-                if torch.all(sample == 0):
-                    logger.info(f"Termination condition detected at frame {i+1}.")
+                # sample will be on the same device as the model output (target_device)
+
+                if i >= MIN_FRAMES_BEFORE_TERMINATION and torch.all(sample == 0):
+                    logger.info(f"Termination condition detected at frame {i+1} (after min threshold).")
                     break
-                samples.append(sample) # Append the generated frame [1, 32]
 
-                # Prepare input for the *next* iteration (Original Sesame Logic)
-                # Input is the frame just generated, formatted correctly.
-                next_token_frame = torch.zeros(1, 1, self._model.config.audio_num_codebooks + 1, dtype=torch.long, device=self.device)
-                next_token_frame_mask = torch.zeros(1, 1, self._model.config.audio_num_codebooks + 1, dtype=torch.bool, device=self.device)
+                samples.append(sample) # Appending tensors on target_device
 
-                # Place sample into audio slots (first 32)
-                next_token_frame[0, 0, :self._model.config.audio_num_codebooks] = sample[0]
+                # Create next inputs directly on the target device
+                next_token_frame = torch.zeros(1, 1, self._model.config.audio_num_codebooks + 1, dtype=torch.long, device=target_device)
+                next_token_frame_mask = torch.zeros(1, 1, self._model.config.audio_num_codebooks + 1, dtype=torch.bool, device=target_device)
+                next_token_frame[0, 0, :self._model.config.audio_num_codebooks] = sample[0] # sample is on target_device
                 next_token_frame_mask[0, 0, :self._model.config.audio_num_codebooks] = True
+                curr_tokens = next_token_frame
+                curr_tokens_mask = next_token_frame_mask
+                # curr_pos update should also be on target_device implicitly
+                curr_pos = curr_pos[:, -1:] + 1
 
-                # Update variables for next loop iteration
-                curr_tokens = next_token_frame         # Next input token frame
-                curr_tokens_mask = next_token_frame_mask # Next input mask frame
-                curr_pos = curr_pos[:, -1:] + 1      # Increment global position
-
-                # --- Progress Logging ---
                 if (i + 1) % log_interval == 0:
-                     # loop_iter_end = time.perf_counter() # Optional
-                     elapsed_loop = time.perf_counter() - start_time_loop
-                     frames_per_sec = (i + 1) / elapsed_loop if elapsed_loop > 0 else float('inf')
-                     logger.info(f"Generated frame {i+1}/{max_generation_len} ({frames_per_sec:.2f} frames/sec so far)")
-                # --- End Progress Logging ---
+                     elapsed = time.perf_counter() - start_time_loop
+                     logger.debug(f"Generated frame {i+1}/{max_generation_len} ({elapsed:.2f}s elapsed)")
 
             except Exception as frame_e:
                 logger.error(f"Error during frame generation {i+1}: {frame_e}", exc_info=True)
-                break
-        # --- End Generation Loop (Reverted) ---
+                # If error is device mismatch, log devices
+                if "Expected all tensors to be on the same device" in str(frame_e):
+                     logger.error(f"Device state: Model on {next(self._model.parameters()).device}, curr_tokens on {curr_tokens.device}, curr_tokens_mask on {curr_tokens_mask.device}, curr_pos on {curr_pos.device}")
+                break # Stop generation on error
+        # --- End Generation Loop ---
 
+        # ... (Rest of the function: timing, decoding, return - Ensure decode happens on CPU) ...
         end_time_loop = time.perf_counter()
         logger.debug(f"Frame generation loop finished in {end_time_loop - start_time_loop:.2f} seconds. Generated {len(samples)} frames.")
 
         if not samples:
             logger.warning("No audio frames were generated.")
-            return torch.tensor([]) # Return empty tensor if no samples
+            return torch.tensor([]) # Return empty CPU tensor
 
         logger.debug("Decoding generated frames...")
         if not hasattr(self, '_audio_tokenizer') or self._audio_tokenizer is None:
@@ -354,30 +390,24 @@ class Generator:
              return torch.tensor([])
 
         try:
-            # --- Decoding (Keep aligned with Fork/Original) ---
-            if not samples:
-                 logger.warning("No samples generated for decoding.")
-                 return torch.tensor([])
-
-            # Stack samples: List of [1, 32] -> [len(samples), 1, 32]
+            # Stack tensors (will be on target_device)
             stacked_samples = torch.stack(samples)
-            # Permute for decoder: [len(samples), 1, 32] -> [1, 32, len(samples)] (B, K, T)
             stacked_samples = stacked_samples.permute(1, 2, 0)
 
-            # Decode with all codebooks (consistent with original non-streaming decode)
-            decoded_audio = self._audio_tokenizer.decode(stacked_samples)
-            # --- End Decoding ---
-
-            # Squeeze unnecessary dimensions (batch and channel if mono)
+            # --- Decoding often happens on CPU, ensure input is moved ---
+            # (Assuming _audio_tokenizer.decode expects CPU tensors)
+            decoded_audio = self._audio_tokenizer.decode(stacked_samples.cpu())
+            # --- End CPU move ---
             decoded_audio = decoded_audio.squeeze(0).squeeze(0)
             logger.debug("Frames decoded successfully.")
 
             end_time_generate = time.perf_counter()
             logger.info(f"Generator.generate completed in {end_time_generate - start_time_generate:.2f} seconds total.")
+            # Return final audio on CPU
             return decoded_audio.cpu()
         except Exception as decode_e:
             logger.error(f"Error decoding audio frames: {decode_e}", exc_info=True)
-            return torch.tensor([]) # Return empty on decoding error
+            return torch.tensor([]) # Return empty CPU tensor
 
 def load_csm_1b_local(model_path: str, device: str = "cuda", audio_num_codebooks: int = 32):
     """
