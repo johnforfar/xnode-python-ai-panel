@@ -260,13 +260,20 @@ class Model(*BaseModelClass):
         h = masked_embeds.sum(dim=2)
         # self.logger.debug(f"--- Backbone Call ---")
         try:
+            # --- >>> NEW FIX: Cast 'h' BEFORE backbone call <<< ---
+            logger.debug(f"Casting input 'h' from {h.dtype} to {dtype} before backbone call.")
+            h = h.to(dtype=dtype)
+            # --- >>> END NEW FIX <<< ---
             curr_backbone_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
             # --- ALIGNMENT: Cast backbone OUTPUT ---
             backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask).to(dtype=dtype)
             # --- End ALIGNMENT ---
             h = backbone_output
         except Exception as e:
+             # Add extra logging here to see the dtype of h *just before* the call
              self.logger.error(f"--- ERROR during self.backbone call ---", exc_info=True)
+             self.logger.error(f"Dtype of 'h' JUST BEFORE self.backbone call: {h.dtype}")
+             self.logger.error(f"Model's target dtype: {dtype}")
              raise
         # --- End Backbone Section ---
 
