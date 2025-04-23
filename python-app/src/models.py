@@ -219,16 +219,46 @@ class Model(*BaseModelClass):
             logger.debug("Causal masks registered successfully.")
 
             # --- WORKAROUND: Ensure KVCache.cache_pos is on the correct device ---
-            logger.debug(f"Attempting to move internal KVCache.cache_pos tensors to device: {device}...")
-            moved_count = 0
-            for module in self.modules():
+            logger.debug(f"Attempting to correct device for internal KVCache.cache_pos tensors to: {device}...")
+            corrected_count = 0
+            for name, module in self.named_modules(): # Use named_modules for better logging
                 # Check by class name to avoid potential import issues if torchtune structure differs slightly
                 if module.__class__.__name__ == "KVCache":
                     if hasattr(module, 'cache_pos') and isinstance(module.cache_pos, torch.Tensor):
-                        if module.cache_pos.device != device:
-                            module.cache_pos = module.cache_pos.to(device)
-                            moved_count += 1
-            logger.debug(f"Finished KVCache.cache_pos device check. Moved {moved_count} tensors.")
+                        current_cache_pos = module.cache_pos
+                        if current_cache_pos.device != device:
+                            logger.warning(f"KVCache module '{name}' has cache_pos on incorrect device ({current_cache_pos.device}). Attempting to replace buffer.")
+                            try:
+                                # Get shape and dtype from existing tensor before deleting
+                                max_len = current_cache_pos.shape[0]
+                                buffer_dtype = current_cache_pos.dtype # Use existing dtype
+
+                                # Delete the existing buffer attribute
+                                del module.cache_pos
+                                # Also try removing from the internal dict just in case
+                                if "cache_pos" in module._buffers:
+                                    del module._buffers["cache_pos"]
+                                    logger.debug(f"Removed 'cache_pos' from _buffers dict for '{name}'.")
+
+                                # Create the new tensor on the target device
+                                new_cache_pos = torch.arange(max_len, device=device, dtype=buffer_dtype) # Use original dtype
+
+                                # Register the new tensor as a buffer
+                                module.register_buffer("cache_pos", new_cache_pos, persistent=False)
+                                logger.info(f"Successfully replaced cache_pos buffer for KVCache module '{name}' with tensor on device {device}.")
+                                corrected_count += 1
+
+                            except Exception as e_buf:
+                                logger.error(f"Failed to replace cache_pos buffer for KVCache module '{name}': {e_buf}", exc_info=True)
+                        # else: # Optional log if it's already correct
+                        #    logger.debug(f"KVCache module '{name}' cache_pos already on correct device ({device}).")
+
+                    elif hasattr(module, 'cache_pos'):
+                         logger.warning(f"KVCache module '{name}' has cache_pos, but it's not a Tensor? Type: {type(module.cache_pos)}")
+                    #else: # Optional log if 'cache_pos' attribute is missing
+                    #    logger.debug(f"KVCache module '{name}' does not have 'cache_pos' attribute.")
+
+            logger.debug(f"Finished KVCache.cache_pos device correction check. Replaced {corrected_count} buffers.")
             # --- END WORKAROUND ---
 
         except AttributeError as e:
