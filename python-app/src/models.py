@@ -261,7 +261,14 @@ class Model(*BaseModelClass):
         masked_embeds = embeds * tokens_mask.unsqueeze(-1)
         h = masked_embeds.sum(dim=2)
         try:
-            curr_backbone_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
+            # Get current sequence length
+            curr_seq_len = input_pos.size(1)
+            # Index the original causal mask
+            indexed_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
+            # --- FIX: Slice the mask's last dimension to match the current sequence length --- 
+            curr_backbone_mask = indexed_mask[:, :, :curr_seq_len]
+            # logger.debug(f"Indexed mask shape: {indexed_mask.shape}, Sliced mask shape: {curr_backbone_mask.shape}") # Optional debug log
+            # --- End FIX ---
             # Call backbone (input 'h' might be float32 from embeddings)
             backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask)
             # --- ALIGNMENT: Cast backbone OUTPUT to match model dtype ---
