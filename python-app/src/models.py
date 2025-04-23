@@ -189,7 +189,7 @@ class Model(*BaseModelClass):
         try:
             logger.debug("Calling backbone.setup_caches...")
             # Pass device explicitly to ensure internal tensors like cache_pos are on the right device
-            self.backbone.setup_caches(max_batch_size, dtype=dtype, device=device)
+            self.backbone.setup_caches(max_batch_size, dtype=dtype)
             logger.debug(">>> Backbone caches setup call completed.")
         except Exception as e:
             logger.error(f"Failed to call backbone.setup_caches: {e}", exc_info=True)
@@ -197,7 +197,7 @@ class Model(*BaseModelClass):
         try:
             logger.debug("Calling decoder.setup_caches...")
             # Pass device explicitly
-            self.decoder.setup_caches(max_batch_size, dtype=dtype, decoder_max_seq_len=self.config.audio_num_codebooks, device=device)
+            self.decoder.setup_caches(max_batch_size, dtype=dtype, decoder_max_seq_len=self.config.audio_num_codebooks)
             logger.debug(">>> Decoder caches setup call completed.")
         except Exception as e:
             logger.error(f"Failed to call decoder.setup_caches: {e}", exc_info=True)
