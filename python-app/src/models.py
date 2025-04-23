@@ -261,8 +261,10 @@ class Model(*BaseModelClass):
         # self.logger.debug(f"--- Backbone Call ---")
         try:
             curr_backbone_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
-            backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask)
-            h = backbone_output # Use output directly (CPU float32 fix)
+            # --- ALIGNMENT: Cast backbone OUTPUT ---
+            backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask).to(dtype=dtype)
+            # --- End ALIGNMENT ---
+            h = backbone_output
         except Exception as e:
              self.logger.error(f"--- ERROR during self.backbone call ---", exc_info=True)
              raise
@@ -308,8 +310,10 @@ class Model(*BaseModelClass):
                 # self.logger.debug(f"  Calculated curr_decoder_mask shape: {curr_decoder_mask.shape}")
 
                 # Call decoder with the projected input, its positions, and mask
-                decoder_output = self.decoder(projected_input, input_pos=curr_pos_decoder, mask=curr_decoder_mask)
-                decoder_h = decoder_output # Use output directly (CPU float32 fix)
+                # --- ALIGNMENT: Cast decoder OUTPUT ---
+                decoder_output = self.decoder(projected_input, input_pos=curr_pos_decoder, mask=curr_decoder_mask).to(dtype=dtype)
+                # --- End ALIGNMENT ---
+                decoder_h = decoder_output
 
             except Exception as e:
                 self.logger.error(f"--- ERROR during self.decoder call at step {i} ---", exc_info=True)
