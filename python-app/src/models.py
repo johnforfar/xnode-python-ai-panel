@@ -217,6 +217,20 @@ class Model(*BaseModelClass):
             self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
             self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_mask_len, device), persistent=False)
             logger.debug("Causal masks registered successfully.")
+
+            # --- WORKAROUND: Ensure KVCache.cache_pos is on the correct device ---
+            logger.debug(f"Attempting to move internal KVCache.cache_pos tensors to device: {device}...")
+            moved_count = 0
+            for module in self.modules():
+                # Check by class name to avoid potential import issues if torchtune structure differs slightly
+                if module.__class__.__name__ == "KVCache":
+                    if hasattr(module, 'cache_pos') and isinstance(module.cache_pos, torch.Tensor):
+                        if module.cache_pos.device != device:
+                            module.cache_pos = module.cache_pos.to(device)
+                            moved_count += 1
+            logger.debug(f"Finished KVCache.cache_pos device check. Moved {moved_count} tensors.")
+            # --- END WORKAROUND ---
+
         except AttributeError as e:
              logger.error(f"Failed to get max_seq_len from backbone: {e}. Cannot create causal masks.")
         except Exception as e:
