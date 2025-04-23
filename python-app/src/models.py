@@ -272,6 +272,9 @@ class Model(*BaseModelClass):
              self.logger.error(f"--- ERROR during self.backbone call ---", exc_info=True)
              # Log input and model dtypes for debugging
              self.logger.error(f"Input 'h' dtype JUST BEFORE backbone call: {h.dtype}")
+             # Add device logging
+             self.logger.error(f"Input 'h' device: {h.device}, Input 'input_pos' device: {input_pos.device}, Input 'mask' device: {curr_backbone_mask.device}")
+             self.logger.error(f"Model backbone device: {next(self.backbone.parameters()).device}")
              self.logger.error(f"Model's target dtype: {dtype}")
              raise
         # --- End Backbone Section ---
