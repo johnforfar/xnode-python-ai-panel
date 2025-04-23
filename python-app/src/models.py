@@ -238,87 +238,58 @@ class Model(*BaseModelClass):
         temperature: float,
         topk: int,
     ) -> torch.Tensor:
-        """Generates one frame of audio tokens (KV Caching ENABLED)."""
-        # Based on ORIGINAL Sesame models.py logic
-        backbone_caches_enabled = getattr(self.backbone, 'caches_are_enabled', False)
-        decoder_caches_enabled = getattr(self.decoder, 'caches_are_enabled', False)
-
-        if not backbone_caches_enabled:
-             self.logger.error("Assertion failed: Backbone caches not enabled!")
-             raise AssertionError("Backbone caches are not enabled. Call setup_caches first.")
-        if not decoder_caches_enabled:
-             self.logger.error("Assertion failed: Decoder caches not enabled!")
-             raise AssertionError("Decoder caches are not enabled. Call setup_caches first.")
-        # self.logger.debug("Assertions passed: Caches enabled.") # Optional
-
+        # Get model's expected dtype (should be set correctly by loading now)
         dtype = next(self.parameters()).dtype
         device = next(self.parameters()).device
 
-        # --- Backbone Section (As before) ---
+        # --- Backbone Section ---
         embeds = self._embed_tokens(tokens)
         masked_embeds = embeds * tokens_mask.unsqueeze(-1)
         h = masked_embeds.sum(dim=2)
-        # self.logger.debug(f"--- Backbone Call ---")
         try:
-            # --- >>> NEW FIX: Cast 'h' BEFORE backbone call <<< ---
-            logger.debug(f"Casting input 'h' from {h.dtype} to {dtype} before backbone call.")
-            h = h.to(dtype=dtype)
-            # --- >>> END NEW FIX <<< ---
             curr_backbone_mask = _index_causal_mask(self.backbone_causal_mask, input_pos)
-            # --- ALIGNMENT: Cast backbone OUTPUT ---
-            backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask).to(dtype=dtype)
+            # Call backbone (input 'h' might be float32 from embeddings)
+            backbone_output = self.backbone(h, input_pos=input_pos, mask=curr_backbone_mask)
+            # --- ALIGNMENT: Cast backbone OUTPUT to match model dtype ---
+            backbone_output = backbone_output.to(dtype=dtype)
             # --- End ALIGNMENT ---
             h = backbone_output
         except Exception as e:
-             # Add extra logging here to see the dtype of h *just before* the call
              self.logger.error(f"--- ERROR during self.backbone call ---", exc_info=True)
-             self.logger.error(f"Dtype of 'h' JUST BEFORE self.backbone call: {h.dtype}")
+             # Log input and model dtypes for debugging
+             self.logger.error(f"Input 'h' dtype JUST BEFORE backbone call: {h.dtype}")
              self.logger.error(f"Model's target dtype: {dtype}")
              raise
         # --- End Backbone Section ---
 
-        # --- Decoder Section (Reverted to Original Sesame Logic) ---
+        # --- Decoder Section ---
         last_h = h[:, -1, :]
-        c0_logits = self.codebook0_head(last_h)
+        c0_logits = self.codebook0_head(last_h) # Head should handle dtype or cast input if needed
         c0_sample = sample_topk(c0_logits, topk, temperature)
         c0_embed = self._embed_audio(0, c0_sample)
 
-        curr_h = torch.cat([last_h.unsqueeze(1), c0_embed], dim=1) # Input for first decoder step
-        curr_sample = c0_sample.clone() # Stores generated codebook tokens
-        # Position tracker for the decoder input sequence (starts at 0, grows)
+        curr_h = torch.cat([last_h.unsqueeze(1), c0_embed], dim=1)
+        curr_sample = c0_sample.clone()
         curr_pos_decoder = torch.arange(0, curr_h.size(1), device=curr_h.device).unsqueeze(0).repeat(curr_h.size(0), 1)
 
         if not hasattr(self, 'decoder_causal_mask'):
              self.logger.error("self.decoder_causal_mask not found!")
              raise AttributeError("Model is missing 'decoder_causal_mask', cannot generate.")
 
-        # Decoder loop: i goes from 1 to 31 (predicting codebooks 1 to 31)
-        # --- REVERT decoder loop logic to match original ---
-        if hasattr(self.decoder, 'reset_caches'): # Reset cache before the loop
-             self.decoder.reset_caches()
-        else:
-             self.logger.warning("Decoder has no reset_caches method!")
-
+        # --- ALIGNMENT: Decoder cache reset INSIDE loop ---
         for i in range(1, self.config.audio_num_codebooks):
-            # Reset cache *inside* the loop (as per original models.py)
-            # This seems necessary for the original non-streaming logic to work with the cache
-            # if hasattr(self.decoder, 'reset_caches'):
-            #    self.decoder.reset_caches() # Keep reset inside loop as per original
-
+            if hasattr(self.decoder, 'reset_caches'):
+                 self.decoder.reset_caches()
+            else:
+                 self.logger.warning("Decoder has no reset_caches method!")
+            # --- End ALIGNMENT ---
             try:
-                # Project the current hidden state (curr_h)
-                projected_input = self.projection(curr_h) # Input for decoder
-                # Index the mask using the current decoder position tracker
+                projected_input = self.projection(curr_h)
                 curr_decoder_mask = _index_causal_mask(self.decoder_causal_mask, curr_pos_decoder)
-
-                # self.logger.debug(f"--- Decoder Step {i} ---")
-                # self.logger.debug(f"  Input projected_input shape: {projected_input.shape}")
-                # self.logger.debug(f"  Input curr_pos_decoder shape: {curr_pos_decoder.shape}, values:\n{curr_pos_decoder}")
-                # self.logger.debug(f"  Calculated curr_decoder_mask shape: {curr_decoder_mask.shape}")
-
-                # Call decoder with the projected input, its positions, and mask
-                # --- ALIGNMENT: Cast decoder OUTPUT ---
-                decoder_output = self.decoder(projected_input, input_pos=curr_pos_decoder, mask=curr_decoder_mask).to(dtype=dtype)
+                # Call decoder
+                decoder_output = self.decoder(projected_input, input_pos=curr_pos_decoder, mask=curr_decoder_mask)
+                # --- ALIGNMENT: Cast decoder OUTPUT to match model dtype ---
+                decoder_output = decoder_output.to(dtype=dtype)
                 # --- End ALIGNMENT ---
                 decoder_h = decoder_output
 
@@ -326,19 +297,16 @@ class Model(*BaseModelClass):
                 self.logger.error(f"--- ERROR during self.decoder call at step {i} ---", exc_info=True)
                 raise
 
-            # Sample the next codebook token (ci)
-            ci_logits = torch.mm(decoder_h[:, -1, :], self.audio_head[i - 1])
+            ci_logits = torch.mm(decoder_h[:, -1, :], self.audio_head[i - 1]) # Head handles dtype
             ci_sample = sample_topk(ci_logits, topk, temperature)
             ci_embed = self._embed_audio(i, ci_sample)
 
-            # Update state for the *next* iteration:
-            curr_h = ci_embed # Input for next step is the embedding of the token just generated
+            curr_h = ci_embed
             curr_sample = torch.cat([curr_sample, ci_sample], dim=1)
-            curr_pos_decoder = curr_pos_decoder[:, -1:] + 1 # Increment decoder position tracker
-        # --- End Revert ---
+            curr_pos_decoder = curr_pos_decoder[:, -1:] + 1
         # --- End Decoder Section ---
 
-        return curr_sample # Shape [B, 32]
+        return curr_sample # dtype should be torch.int64 or similar from sampling
 
     # --- Embedding helpers (as provided) ---
     def _embed_audio(self, codebook: int, tokens: torch.Tensor) -> torch.Tensor:

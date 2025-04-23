@@ -407,7 +407,7 @@ class Generator:
 
 def load_csm_1b_local(model_path: str, device: str = "cuda", audio_num_codebooks: int = 32):
     """
-    Load the CSM-1B model from a local checkpoint path.
+    Load the CSM-1B model from a local checkpoint path, aligning with original repo dtype handling.
     model_path should be the BASE models directory (e.g., /path/to/models)
     """
     target_device = torch.device(device)
@@ -419,17 +419,40 @@ def load_csm_1b_local(model_path: str, device: str = "cuda", audio_num_codebooks
          raise FileNotFoundError(f"CSM local model directory not found: {csm_specific_path}")
 
     try:
+        # Load to CPU first
         model = Model.from_local_pretrained(str(csm_specific_path))
-        logger.info(f"Moving loaded model to target device: {target_device}")
-        model = model.to(target_device)
+
+        # --- ALIGNMENT: Determine target dtype and cast model globally during device move ---
+        logger.info(f"Moving loaded model to target device: {target_device} and casting global dtype...")
+        # Determine target dtype based on device and support
+        if target_device.type == 'cuda':
+            if torch.cuda.is_bf16_supported():
+                target_dtype = torch.bfloat16
+                logger.info("Targeting bfloat16 dtype (CUDA).")
+            else:
+                target_dtype = torch.float16 # Fallback to float16 if bf16 not supported
+                logger.info("Targeting float16 dtype (CUDA, bf16 not supported).")
+        else: # CPU
+            target_dtype = torch.float32 # Use float32 for CPU
+            logger.info("Targeting float32 dtype (CPU).")
+
+        # Move model to target device AND set its global default dtype
+        model = model.to(device=target_device, dtype=target_dtype)
+        # --- End ALIGNMENT ---
+
         model.eval()
-        logger.info(f"Model moved to {target_device} and set to eval mode.")
+        # --- FIX: Check parameter dtype for logging ---
+        log_dtype = next(model.parameters()).dtype if list(model.parameters()) else 'N/A' # Handle potential case of no parameters
+        logger.info(f"Model moved to {target_device} (first param dtype: {log_dtype}) and set to eval mode.")
+        # --- End FIX ---
+
     except Exception as e:
-        logger.error(f"Failed during Model.from_local_pretrained or device transfer for CSM: {e}", exc_info=True)
+        logger.error(f"Failed during Model.from_local_pretrained or device/dtype transfer for CSM: {e}", exc_info=True)
         raise
 
     logger.info("CSM Model loaded and moved. Creating generator...")
-    generator = Generator(model, device=target_device)
+    # Pass the actual device object to the Generator
+    generator = Generator(model, device=target_device) # Generator init determines cache_dtype based on support
     return generator
 
 def load_csm_1b(device: str = "cuda", model_dir: Path | str | None = None) -> Generator:
