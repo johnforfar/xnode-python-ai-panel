@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { LiveAudioVisualizer } from "react-audio-visualize";
+import { useAudioRecorder } from "react-audio-voice-recorder";
+import { Mic, Square } from "lucide-react";
 
 // Define types for conversation messages (Adjust if backend format differs)
 interface ConversationMessage {
@@ -56,6 +59,8 @@ export default function Home() {
   // --- ADDED TTS State ---
   const [autoPlayAudio, setAutoPlayAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); // Ref for the single audio player instance
+  const [audioPlayer, setAudioPlayer] = useState<MediaRecorder | null>(null);
+  const recorder = useAudioRecorder();
   // --- End TTS State ---
 
   // Autoscroll chat to bottom
@@ -274,14 +279,28 @@ export default function Home() {
 
     // Set the source to the PROXY URL and play
     audioRef.current.src = finalAudioUrl; // Use the corrected proxy URL
-    audioRef.current.play().catch((e) => {
-      console.error("Audio play failed:", e);
-      setConversation((prev) =>
-        prev.map((m) =>
-          m.timestamp === timestamp ? { ...m, audioStatus: "failed" } : m
-        )
-      );
-    });
+    audioRef.current
+      .play()
+      .then(async () => {
+        let stream: MediaStream | undefined;
+        while (stream === undefined || stream.getTracks().length === 0) {
+          stream = (
+            audioRef.current as any as { captureStream(): MediaStream }
+          ).captureStream();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        const player = new MediaRecorder(stream);
+        player.start();
+        setAudioPlayer(player);
+      })
+      .catch((e) => {
+        console.error("Audio play failed:", e);
+        setConversation((prev) =>
+          prev.map((m) =>
+            m.timestamp === timestamp ? { ...m, audioStatus: "failed" } : m
+          )
+        );
+      });
 
     // --- Add listeners (unchanged logic, but logs will show proxy URL on error) ---
     const currentAudioElement = audioRef.current;
@@ -759,6 +778,31 @@ export default function Home() {
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex flex-col w-full place-items-center m-2">
+            <button
+              onClick={() =>
+                recorder.isRecording
+                  ? recorder.stopRecording()
+                  : recorder.startRecording()
+              }
+            >
+              {recorder.isRecording ? <Square /> : <Mic />}
+            </button>
+            {recorder.mediaRecorder && (
+              <LiveAudioVisualizer
+                mediaRecorder={recorder.mediaRecorder}
+                width={500}
+                height={50}
+              />
+            )}
+            {audioPlayer && (
+              <LiveAudioVisualizer
+                mediaRecorder={audioPlayer}
+                width={500}
+                height={50}
+              />
+            )}
+          </div>
           {/* Messages container */}
           <ScrollArea className="flex-1">
             <div className="px-6 py-4">
