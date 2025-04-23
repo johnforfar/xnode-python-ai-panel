@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { LiveAudioVisualizer } from "react-audio-visualize";
+import { useAudioRecorder } from "react-audio-voice-recorder";
+import { Mic, Square } from "lucide-react";
 
 // Define types for conversation messages (Adjust if backend format differs)
 interface ConversationMessage {
@@ -57,6 +60,8 @@ export default function Home() {
   // --- ADDED TTS State ---
   const [autoPlayAudio, setAutoPlayAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); // Ref for the single audio player instance
+  const [audioPlayer, setAudioPlayer] = useState<MediaRecorder | null>(null);
+  const recorder = useAudioRecorder();
   // --- End TTS State ---
 
   // Autoscroll chat to bottom
@@ -245,8 +250,10 @@ export default function Home() {
       : url; // If it's already a full URL somehow, use it (fallback)
 
     // Ensure it starts with a slash if it became relative
-    const finalAudioUrl = proxyAudioUrl.startsWith("/") ? proxyAudioUrl : `/${proxyAudioUrl}`;
-     // --- End FIX ---
+    const finalAudioUrl = proxyAudioUrl.startsWith("/")
+      ? proxyAudioUrl
+      : `/${proxyAudioUrl}`;
+    // --- End FIX ---
 
     console.log(`Playing audio for ${timestamp} via proxy: ${finalAudioUrl}`); // Log the proxy URL
 
@@ -272,6 +279,18 @@ export default function Home() {
     audioRef.current.src = finalAudioUrl; // Use the corrected proxy URL
     audioRef.current
       .play()
+      .then(async () => {
+        let stream: MediaStream | undefined;
+        while (stream === undefined || stream.getTracks().length === 0) {
+          stream = (
+            audioRef.current as any as { captureStream(): MediaStream }
+          ).captureStream();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        const player = new MediaRecorder(stream);
+        player.start();
+        setAudioPlayer(player);
+      })
       .catch((e) => {
         console.error("Audio play failed:", e);
         setConversation((prev) =>
@@ -303,17 +322,17 @@ export default function Home() {
       cleanupListeners();
     };
 
-     const cleanupListeners = () => {
-         currentAudioElement?.removeEventListener('ended', onEnded);
-         currentAudioElement?.removeEventListener('error', onError);
-     };
+    const cleanupListeners = () => {
+      currentAudioElement?.removeEventListener("ended", onEnded);
+      currentAudioElement?.removeEventListener("error", onError);
+    };
 
     // Clear previous listeners before adding new ones
-     currentAudioElement?.removeEventListener('ended', onEnded);
-     currentAudioElement?.removeEventListener('error', onError);
+    currentAudioElement?.removeEventListener("ended", onEnded);
+    currentAudioElement?.removeEventListener("error", onError);
 
-    currentAudioElement?.addEventListener('ended', onEnded);
-    currentAudioElement?.addEventListener('error', onError);
+    currentAudioElement?.addEventListener("ended", onEnded);
+    currentAudioElement?.addEventListener("error", onError);
     // --- End Listeners ---
   };
   // --- End Play Audio Handler Modification ---
@@ -381,27 +400,49 @@ export default function Home() {
           console.log("WebSocket message received:", message);
 
           switch (message.type) {
-            case 'agent_message':
+            case "agent_message":
               // Payload now includes initial audioStatus: "generating"
               setConversation((prev) => [...prev, message.payload]);
               break;
-            case 'audio_update':
+            case "audio_update":
               // Find the message by timestamp and update audio status/URL
               setConversation((prev) =>
                 prev.map((msg) =>
                   msg.timestamp === message.payload.timestamp
-                    ? { ...msg, audioStatus: message.payload.audioStatus, audioUrl: message.payload.audioUrl }
+                    ? {
+                        ...msg,
+                        audioStatus: message.payload.audioStatus,
+                        audioUrl: message.payload.audioUrl,
+                      }
                     : msg
                 )
               );
               // Auto-play logic moved to separate effect
               break;
-            case 'status_update': setPanelStatus(message.payload); break;
-            case 'system_message': setConversation((prev) => [...prev, { agent: "System", address: "system", timestamp: new Date().toISOString(), audioStatus: "failed", ...message.payload }]); break; // System messages can't have audio
-            default: console.warn("Received unknown message type:", message.type);
+            case "status_update":
+              setPanelStatus(message.payload);
+              break;
+            case "system_message":
+              setConversation((prev) => [
+                ...prev,
+                {
+                  agent: "System",
+                  address: "system",
+                  timestamp: new Date().toISOString(),
+                  audioStatus: "failed",
+                  ...message.payload,
+                },
+              ]);
+              break; // System messages can't have audio
+            default:
+              console.warn("Received unknown message type:", message.type);
           }
         } catch (e) {
-          console.error("Failed to parse WebSocket message or invalid format:", event.data, e);
+          console.error(
+            "Failed to parse WebSocket message or invalid format:",
+            event.data,
+            e
+          );
           setError("Received invalid message from backend.");
         }
       }
@@ -495,21 +536,28 @@ export default function Home() {
 
   // --- Auto-Play Effect ---
   useEffect(() => {
-      if (!autoPlayAudio) return;
+    if (!autoPlayAudio) return;
 
-      // Find the *last* message in the array that just became 'ready'
-      // This avoids playing older messages if multiple become ready at once
-      const lastMessage = conversation[conversation.length - 1];
+    // Find the *last* message in the array that just became 'ready'
+    // This avoids playing older messages if multiple become ready at once
+    const lastMessage = conversation[conversation.length - 1];
 
-      if (lastMessage && lastMessage.audioStatus === 'ready' && lastMessage.audioUrl && lastMessage.agent !== "System") {
-          // Check if it was *previously* not ready (to avoid replaying on unrelated updates)
-          // This requires comparing with previous state, which is complex here.
-          // Simpler approach: Play if it's ready and hasn't been played automatically yet.
-          // We need a way to mark it as 'auto-played' or rely on the 'playing' state transition.
-          // Let's try playing it directly if it's the last message and is 'ready'.
-          console.log(`Auto-play triggered for last message [${lastMessage.timestamp}]`);
-          handlePlay(lastMessage.timestamp, lastMessage.audioUrl);
-      }
+    if (
+      lastMessage &&
+      lastMessage.audioStatus === "ready" &&
+      lastMessage.audioUrl &&
+      lastMessage.agent !== "System"
+    ) {
+      // Check if it was *previously* not ready (to avoid replaying on unrelated updates)
+      // This requires comparing with previous state, which is complex here.
+      // Simpler approach: Play if it's ready and hasn't been played automatically yet.
+      // We need a way to mark it as 'auto-played' or rely on the 'playing' state transition.
+      // Let's try playing it directly if it's the last message and is 'ready'.
+      console.log(
+        `Auto-play triggered for last message [${lastMessage.timestamp}]`
+      );
+      handlePlay(lastMessage.timestamp, lastMessage.audioUrl);
+    }
   }, [conversation, autoPlayAudio]); // Re-run when conversation or toggle changes
   // --- End Auto-Play Effect ---
 
@@ -535,26 +583,49 @@ export default function Home() {
   };
 
   // --- NEW: Audio Status Icon Component ---
-  const AudioStatusIcon = ({ status, url, timestamp }: { status?: string; url?: string | null; timestamp: string }) => {
-    if (!status || status === 'failed') {
-        return <span title="Audio generation failed" className="text-red-500 ml-2">❌</span>;
+  const AudioStatusIcon = ({
+    status,
+    url,
+    timestamp,
+  }: {
+    status?: string;
+    url?: string | null;
+    timestamp: string;
+  }) => {
+    if (!status || status === "failed") {
+      return (
+        <span title="Audio generation failed" className="text-red-500 ml-2">
+          ❌
+        </span>
+      );
     }
-    if (status === 'generating') {
-        return <span title="Generating audio..." className="text-yellow-500 ml-2 animate-pulse">⏳</span>;
+    if (status === "generating") {
+      return (
+        <span
+          title="Generating audio..."
+          className="text-yellow-500 ml-2 animate-pulse"
+        >
+          ⏳
+        </span>
+      );
     }
-     if (status === 'playing') {
-        return <span title="Playing audio..." className="text-blue-400 ml-2">🔊</span>;
+    if (status === "playing") {
+      return (
+        <span title="Playing audio..." className="text-blue-400 ml-2">
+          🔊
+        </span>
+      );
     }
-    if (status === 'ready' && url) {
-        return (
-            <button
-                title="Play audio"
-                onClick={() => handlePlay(timestamp, url)}
-                className="ml-2 text-green-400 hover:text-green-300 transition-colors"
-            >
-                ▶️
-            </button>
-        );
+    if (status === "ready" && url) {
+      return (
+        <button
+          title="Play audio"
+          onClick={() => handlePlay(timestamp, url)}
+          className="ml-2 text-green-400 hover:text-green-300 transition-colors"
+        >
+          ▶️
+        </button>
+      );
     }
     return null; // No icon if status is unknown or not applicable
   };
@@ -564,7 +635,7 @@ export default function Home() {
   return (
     <>
       {/* --- ADD Hidden Audio Player --- */}
-      <audio ref={audioRef} style={{ display: 'none' }} />
+      <audio ref={audioRef} style={{ display: "none" }} />
       {/* --- End Hidden Audio Player --- */}
 
       {/* Main container */}
@@ -672,13 +743,18 @@ export default function Home() {
               </button>
               {/* --- ADD Auto-Play Toggle --- */}
               <div className="flex items-center space-x-2">
-                 <Switch
-                     id="autoplay-audio"
-                     checked={autoPlayAudio}
-                     onCheckedChange={setAutoPlayAudio}
-                     aria-label="Auto-play audio"
-                  />
-                 <Label htmlFor="autoplay-audio" className="text-sm cursor-pointer">Auto-Play Audio</Label>
+                <Switch
+                  id="autoplay-audio"
+                  checked={autoPlayAudio}
+                  onCheckedChange={setAutoPlayAudio}
+                  aria-label="Auto-play audio"
+                />
+                <Label
+                  htmlFor="autoplay-audio"
+                  className="text-sm cursor-pointer"
+                >
+                  Auto-Play Audio
+                </Label>
               </div>
               {/* --- End Auto-Play Toggle --- */}
             </div>
@@ -693,6 +769,31 @@ export default function Home() {
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex flex-col w-full place-items-center m-2">
+            <button
+              onClick={() =>
+                recorder.isRecording
+                  ? recorder.stopRecording()
+                  : recorder.startRecording()
+              }
+            >
+              {recorder.isRecording ? <Square /> : <Mic />}
+            </button>
+            {recorder.mediaRecorder && (
+              <LiveAudioVisualizer
+                mediaRecorder={recorder.mediaRecorder}
+                width={500}
+                height={50}
+              />
+            )}
+            {audioPlayer && (
+              <LiveAudioVisualizer
+                mediaRecorder={audioPlayer}
+                width={500}
+                height={50}
+              />
+            )}
+          </div>
           {/* Messages container */}
           <ScrollArea className="flex-1">
             <div className="px-6 py-4">
@@ -711,10 +812,20 @@ export default function Home() {
                       </div>{" "}
                       {/* Allow long words to break */}
                       <div className="flex justify-end items-center text-xs text-gray-500 mt-1">
-                        <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                        <span>
+                          {new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </span>
                         {/* Conditionally render icon only for non-system messages */}
                         {msg.agent !== "System" && (
-                           <AudioStatusIcon status={msg.audioStatus} url={msg.audioUrl} timestamp={msg.timestamp} />
+                          <AudioStatusIcon
+                            status={msg.audioStatus}
+                            url={msg.audioUrl}
+                            timestamp={msg.timestamp}
+                          />
                         )}
                       </div>
                     </div>

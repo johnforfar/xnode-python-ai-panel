@@ -24,13 +24,13 @@ export async function GET(
   try {
     // Fetch the audio file from the backend server-side
     const backendResponse = await fetch(backendUrl, {
-        method: "GET",
-        headers: {
-            // Add any necessary headers if your backend requires them
-            // 'Authorization': 'Bearer your_token'
-        },
-         // Important for fetch caching behavior if needed, default might be okay
-        cache: 'no-store'
+      method: "GET",
+      headers: {
+        // Add any necessary headers if your backend requires them
+        // 'Authorization': 'Bearer your_token'
+      },
+      // Important for fetch caching behavior if needed, default might be okay
+      cache: "no-store",
     });
 
     // Check if the backend responded successfully
@@ -49,7 +49,8 @@ export async function GET(
     const audioBlob = await backendResponse.blob();
 
     // Get the content type from the backend response
-    const contentType = backendResponse.headers.get("Content-Type") || "audio/mpeg"; // Default to audio/mpeg
+    const contentType =
+      backendResponse.headers.get("Content-Type") || "audio/mpeg"; // Default to audio/mpeg
 
     // Create a new NextResponse to stream the audio data back to the browser
     const response = new NextResponse(audioBlob, {
@@ -62,17 +63,22 @@ export async function GET(
     });
 
     return response;
-
   } catch (error: any) {
     console.error(`Error fetching audio from backend (${backendUrl}):`, error);
     // Add more detail to the error response if possible
-    const cause = error.cause ? `Cause: ${error.cause.code} ${error.cause.address}:${error.cause.port}` : '';
+    const cause = error.cause
+      ? `Cause: ${error.cause.code} ${error.cause.address}:${error.cause.port}`
+      : "";
     return NextResponse.json(
-      { error: "Internal server error proxying audio", details: error.message, cause },
+      {
+        error: "Internal server error proxying audio",
+        details: error.message,
+        cause,
+      },
       { status: 500 }
     );
   }
 }
 
 // Optional: Handle other methods if needed, otherwise GET is default
-// export async function POST(request: NextRequest) { ... } 
+// export async function POST(request: NextRequest) { ... }
