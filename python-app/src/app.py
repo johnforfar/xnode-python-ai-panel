@@ -8,11 +8,53 @@ from datetime import datetime
 import json
 from pathlib import Path
 from env import data_dir
+import torch
+import torchaudio
+import torchtune
+import subprocess
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
 logger = logging.getLogger(__name__)
 logger.info("--- app.py: Script Start ---")
+
+# --- Add Version Logging ---
+logger.info("--- Library and System Versions ---")
+logger.info(f"Python Executable: {sys.executable}")
+logger.info(f"PyTorch Version: {torch.__version__}")
+logger.info(f"Torchaudio Version: {torchaudio.__version__}")
+try:
+    # Torchtune version might not be standard __version__, check package info if needed
+    # Using the import name for now, replace if inspection fails
+    logger.info(f"Torchtune Version: {torchtune.__version__ if hasattr(torchtune, '__version__') else 'Unknown (check pkg_resources)'}")
+except NameError:
+    logger.warning("Torchtune module not found or version attribute missing.")
+
+if torch.cuda.is_available():
+    logger.info(f"CUDA Available: True")
+    logger.info(f"CUDA Version (linked to PyTorch): {torch.version.cuda}")
+    try:
+        # Attempt to get nvidia-smi output
+        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, check=True)
+        logger.info("--- nvidia-smi Output ---")
+        # Log first few lines to avoid flooding, adjust as needed
+        for i, line in enumerate(result.stdout.splitlines()):
+            if i < 15: # Log ~15 lines of nvidia-smi
+                 logger.info(f"NVIDIA-SMI: {line}")
+            elif i == 15:
+                 logger.info("NVIDIA-SMI: ... (output truncated)")
+                 break
+        logger.info("--- End nvidia-smi Output ---")
+    except FileNotFoundError:
+        logger.warning("nvidia-smi command not found. Cannot get driver version.")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"nvidia-smi failed with error code {e.returncode}: {e.stderr}")
+    except Exception as e:
+        logger.error(f"An error occurred while running nvidia-smi: {e}")
+else:
+    logger.info(f"CUDA Available: False")
+logger.info("-----------------------------------")
+# --- End Version Logging ---
 
 # --- Import PanelManager INSTANCE, and websocket_handler from main.py ---
 try:
