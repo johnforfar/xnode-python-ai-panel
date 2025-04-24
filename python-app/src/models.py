@@ -181,34 +181,38 @@ class Model(*BaseModelClass):
         # nn.init.kaiming_uniform_(self.audio_head, a=math.sqrt(5))
         logger.info("Model components initialized (KV Caching ENABLED).")
 
-    def setup_caches(self, max_batch_size: int, dtype: torch.dtype) -> None:
-        """Setup KV caches."""
+    def setup_caches(self, max_batch_size: int) -> None:
+        """Setup KV caches. Determines dtype/device from model params, uses 'with device' context like original."""
+        # Determine dtype and device internally
+        dtype = next(self.parameters()).dtype
         device = next(self.parameters()).device
-        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, dtype={dtype}")
+        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, dtype={dtype} (determined internally)")
 
+        # --- Use `with device` context manager like original ---
         try:
-            logger.debug("Calling backbone.setup_caches...")
-            # Pass device explicitly to ensure internal tensors like cache_pos are on the right device
-            self.backbone.setup_caches(max_batch_size, dtype=dtype)
-            logger.debug(">>> Backbone caches setup call completed.")
-        except Exception as e:
-            logger.error(f"Failed to call backbone.setup_caches: {e}", exc_info=True)
+            logger.debug(f"Using 'with device({device})' context for cache setup...")
+            with device: # Match original implementation's context manager use
+                logger.debug("Calling backbone.setup_caches (dtype implicitly handled by context/module)...")
+                # Don't pass dtype explicitly, rely on context or module's internal handling
+                self.backbone.setup_caches(max_batch_size) # REMOVED dtype=dtype
+                logger.debug(">>> Backbone caches setup call completed.")
 
-        try:
-            logger.debug("Calling decoder.setup_caches...")
-            # Pass device explicitly
-            self.decoder.setup_caches(max_batch_size, dtype=dtype, decoder_max_seq_len=self.config.audio_num_codebooks)
-            logger.debug(">>> Decoder caches setup call completed.")
-        except Exception as e:
-            logger.error(f"Failed to call decoder.setup_caches: {e}", exc_info=True)
+                logger.debug("Calling decoder.setup_caches (dtype implicitly handled by context/module)...")
+                # Don't pass dtype explicitly here either
+                self.decoder.setup_caches(max_batch_size, decoder_max_seq_len=self.config.audio_num_codebooks) # REMOVED dtype=dtype
+                logger.debug(">>> Decoder caches setup call completed.")
+            logger.debug("Exited 'with device' context.")
 
-        # Causal mask setup (needs correct sequence lengths)
+        except Exception as e:
+            logger.error(f"Failed during cache setup within 'with device' context: {e}", exc_info=True)
+            raise # Re-raise the exception after logging
+
+        # Causal mask setup (remains the same, uses determined device)
         try:
             backbone_max_seq_len = self.backbone.max_seq_len
             decoder_mask_len = self.config.audio_num_codebooks
             logger.debug(f"Creating causal masks: backbone_len={backbone_max_seq_len}, decoder_len={decoder_mask_len}")
 
-            # Detach previous buffers if they exist to allow replacement
             if hasattr(self, 'backbone_causal_mask'):
                 del self.backbone_causal_mask
             if hasattr(self, 'decoder_causal_mask'):
@@ -217,54 +221,12 @@ class Model(*BaseModelClass):
             self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
             self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_mask_len, device), persistent=False)
             logger.debug("Causal masks registered successfully.")
-
-            # --- WORKAROUND: Ensure KVCache.cache_pos is on the correct device ---
-            logger.debug(f"Attempting to correct device for internal KVCache.cache_pos tensors to: {device}...")
-            corrected_count = 0
-            for name, module in self.named_modules(): # Use named_modules for better logging
-                # Check by class name to avoid potential import issues if torchtune structure differs slightly
-                if module.__class__.__name__ == "KVCache":
-                    if hasattr(module, 'cache_pos') and isinstance(module.cache_pos, torch.Tensor):
-                        current_cache_pos = module.cache_pos
-                        if current_cache_pos.device != device:
-                            logger.warning(f"KVCache module '{name}' has cache_pos on incorrect device ({current_cache_pos.device}). Attempting to replace buffer.")
-                            try:
-                                # Get shape and dtype from existing tensor before deleting
-                                max_len = current_cache_pos.shape[0]
-                                buffer_dtype = current_cache_pos.dtype # Use existing dtype
-
-                                # Delete the existing buffer attribute
-                                del module.cache_pos
-                                # Also try removing from the internal dict just in case
-                                if "cache_pos" in module._buffers:
-                                    del module._buffers["cache_pos"]
-                                    logger.debug(f"Removed 'cache_pos' from _buffers dict for '{name}'.")
-
-                                # Create the new tensor on the target device
-                                new_cache_pos = torch.arange(max_len, device=device, dtype=buffer_dtype) # Use original dtype
-
-                                # Register the new tensor as a buffer
-                                module.register_buffer("cache_pos", new_cache_pos, persistent=False)
-                                logger.info(f"Successfully replaced cache_pos buffer for KVCache module '{name}' with tensor on device {device}.")
-                                corrected_count += 1
-
-                            except Exception as e_buf:
-                                logger.error(f"Failed to replace cache_pos buffer for KVCache module '{name}': {e_buf}", exc_info=True)
-                        # else: # Optional log if it's already correct
-                        #    logger.debug(f"KVCache module '{name}' cache_pos already on correct device ({device}).")
-
-                    elif hasattr(module, 'cache_pos'):
-                         logger.warning(f"KVCache module '{name}' has cache_pos, but it's not a Tensor? Type: {type(module.cache_pos)}")
-                    #else: # Optional log if 'cache_pos' attribute is missing
-                    #    logger.debug(f"KVCache module '{name}' does not have 'cache_pos' attribute.")
-
-            logger.debug(f"Finished KVCache.cache_pos device correction check. Replaced {corrected_count} buffers.")
-            # --- END WORKAROUND ---
+            logger.debug("Skipping explicit KVCache.cache_pos device correction.")
 
         except AttributeError as e:
              logger.error(f"Failed to get max_seq_len from backbone: {e}. Cannot create causal masks.")
         except Exception as e:
-             logger.error(f"Error creating causal masks: {e}", exc_info=True)
+             logger.error(f"Error creating or registering causal masks: {e}", exc_info=True)
 
     def reset_caches(self):
         if hasattr(self.backbone, 'reset_caches'):
