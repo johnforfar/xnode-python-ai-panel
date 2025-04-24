@@ -165,20 +165,41 @@ class Model(*BaseModelClass):
         logger.info("Model components initialized (KV Caching ENABLED).")
 
     def setup_caches(self, max_batch_size: int) -> None:
-        """Setup KV caches with device context"""
+        """Setup KV caches. Determines dtype/device from model params, uses 'with device' context."""
         dtype = next(self.parameters()).dtype
         device = next(self.parameters()).device
-        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, dtype={dtype}")
+        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, dtype={dtype} (determined internally)")
 
-        with device:
-            self.backbone.setup_caches(max_batch_size)
-            self.decoder.setup_caches(max_batch_size, decoder_max_seq_len=self.config.audio_num_codebooks)
+        try:
+            logger.debug(f"Using 'with device({device})' context for cache setup...")
+            with device:
+                logger.debug("Calling backbone.setup_caches (passing dtype)...")
+                self.backbone.setup_caches(max_batch_size, dtype=dtype)
+                logger.debug(">>> Backbone caches setup call completed.")
 
-        backbone_max_seq_len = self.backbone.max_seq_len
-        decoder_mask_len = self.config.audio_num_codebooks
-        self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
-        self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_mask_len, device), persistent=False)
-        logger.debug("Causal masks registered successfully.")
+                logger.debug("Calling decoder.setup_caches (passing dtype)...")
+                self.decoder.setup_caches(max_batch_size, dtype=dtype, decoder_max_seq_len=self.config.audio_num_codebooks)
+                logger.debug(">>> Decoder caches setup call completed.")
+            logger.debug("Exited 'with device' context.")
+
+        except Exception as e:
+            logger.error(f"Failed during cache setup within 'with device' context: {e}", exc_info=True)
+            raise
+
+        # Causal mask setup (remains the same)
+        try:
+            backbone_max_seq_len = self.backbone.max_seq_len
+            decoder_mask_len = self.config.audio_num_codebooks
+            logger.debug(f"Creating causal masks: backbone_len={backbone_max_seq_len}, decoder_len={decoder_mask_len}")
+
+            self.register_buffer("backbone_causal_mask", _create_causal_mask(backbone_max_seq_len, device), persistent=False)
+            self.register_buffer("decoder_causal_mask", _create_causal_mask(decoder_mask_len, device), persistent=False)
+            logger.debug("Causal masks registered successfully.")
+
+        except AttributeError as e:
+             logger.error(f"Failed to get max_seq_len from backbone: {e}. Cannot create causal masks.")
+        except Exception as e:
+             logger.error(f"Error creating or registering causal masks: {e}", exc_info=True)
 
     def reset_caches(self):
         if hasattr(self.backbone, 'reset_caches'):
