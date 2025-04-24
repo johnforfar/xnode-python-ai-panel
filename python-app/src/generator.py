@@ -14,7 +14,7 @@ from subprocess import run
 from huggingface_hub import hf_hub_download
 from collections import OrderedDict
 import time # Ensure time is imported for timing
-from env import models_dir
+from env import models_dir, data_dir
 
 # Force CPU usage for all operations
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
@@ -90,7 +90,7 @@ class Generator:
                  raise ImportError("moshi.models.loaders could not be imported.")
 
             # Pass the device to the loader if possible, or move the model after loading
-            mimi_weight = hf_hub_download(loaders.DEFAULT_REPO, loaders.MIMI_NAME) # Now loaders should be defined
+            mimi_weight = hf_hub_download(loaders.DEFAULT_REPO, loaders.MIMI_NAME, cache_dir=Path(data_dir()) / "models/hf_cache") # Now loaders should be defined
             mimi = loaders.get_mimi(mimi_weight, device=self.device) # Pass device here
             # Ensure mimi components are on the correct device
             mimi = mimi.to(self.device)
