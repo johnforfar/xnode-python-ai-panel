@@ -184,15 +184,18 @@ class Model(*BaseModelClass):
     def setup_caches(self, max_batch_size: int, dtype: torch.dtype) -> None:
         """Setup KV caches using the dtype explicitly provided."""
         device = next(self.parameters()).device
-        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, dtype={dtype} (EXPLICITLY PROVIDED)")
+        # Let's determine dtype based on model parameters instead of forcing it
+        model_dtype = next(self.parameters()).dtype
+        logger.info(f"Setting up caches for batch_size={max_batch_size}, device={device}, using model dtype: {model_dtype}")
 
         try:
             with torch.device(device): # Ensure operations happen on the model's device
-                self.backbone.setup_caches(max_batch_size, dtype=dtype)
-                self.decoder.setup_caches(max_batch_size, dtype=dtype, decoder_max_seq_len=self.config.audio_num_codebooks)
+                # Use the determined model_dtype
+                self.backbone.setup_caches(max_batch_size, dtype=model_dtype)
+                self.decoder.setup_caches(max_batch_size, dtype=model_dtype, decoder_max_seq_len=self.config.audio_num_codebooks)
         except Exception as e:
-            logger.error(f"Failed during explicit dtype cache setup: {e}", exc_info=True)
-            raise
+             logger.error(f"Failed during cache setup with dtype {model_dtype}: {e}", exc_info=True)
+             raise
 
         # Causal mask setup (remains the same, uses determined device)
         try:
