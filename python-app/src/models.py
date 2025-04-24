@@ -286,18 +286,6 @@ class Model(*BaseModelClass):
         dtype = next(self.parameters()).dtype
         device = next(self.parameters()).device
 
-        # --- Explicitly move cache_pos just before generation ---
-        try:
-            for module in self.modules():
-                if module.__class__.__name__ == "KVCache":
-                    if hasattr(module, 'cache_pos') and isinstance(module.cache_pos, torch.Tensor):
-                        if module.cache_pos.device != device:
-                            self.logger.warning(f"Re-moving KVCache.cache_pos from {module.cache_pos.device} to {device} before generation!")
-                            module.cache_pos = module.cache_pos.to(device)
-        except Exception as e:
-            self.logger.error(f"Error re-moving cache_pos before generation: {e}", exc_info=True)
-        # --- End Explicit move ---
-
         # --- Backbone Section ---
         embeds = self._embed_tokens(tokens)
         masked_embeds = embeds * tokens_mask.unsqueeze(-1)

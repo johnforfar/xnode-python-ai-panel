@@ -56,22 +56,24 @@ class Generator:
 
         # Setup caches ONCE during initialization
         try:
-            # --- FIX: Revert Cache dtype logic for CUDA ---
-            if self.device.type == 'cpu':
-                cache_dtype = torch.float32 # Use float32 for CPU cache
-                logger.info(f"CPU detected. Setting cache dtype to: {cache_dtype}")
-            else: # CUDA
-                # Use bfloat16 if supported, otherwise float16 (more standard for GPU)
-                if torch.cuda.is_bf16_supported():
-                    cache_dtype = torch.bfloat16
-                    logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype} (bf16 supported)")
-                else:
-                    cache_dtype = torch.float16
-                    logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype} (bf16 NOT supported)")
-            # --- End FIX ---
+            # --- FORCE FLOAT32 for cache ---
+            cache_dtype = torch.float32
+            logger.warning(f"FORCING FLOAT32 for cache dtype (Device: {self.device.type}).")
+            # --- END FORCE FLOAT32 ---
+            # if self.device.type == 'cpu':
+            #     cache_dtype = torch.float32 # Use float32 for CPU cache
+            #     logger.info(f"CPU detected. Setting cache dtype to: {cache_dtype}")
+            # else: # CUDA
+            #     # Use bfloat16 if supported, otherwise float16 (more standard for GPU)
+            #     if torch.cuda.is_bf16_supported():
+            #         cache_dtype = torch.bfloat16
+            #         logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype} (bf16 supported)")
+            #     else:
+            #         cache_dtype = torch.float16
+            #         logger.info(f"CUDA detected. Setting cache dtype to: {cache_dtype} (bf16 NOT supported)")
 
             logger.debug(f"Setting up model caches during Generator init (batch_size=1, device={self.device}, dtype={cache_dtype})...")
-            self._model.to(self.device)
+            self._model.to(self.device) # Ensure model is on device before setup_caches
             # Pass the potentially changed dtype
             self._model.setup_caches(max_batch_size=1, dtype=cache_dtype)
             logger.debug(f"Model caches setup successfully during init.")
@@ -425,16 +427,20 @@ def load_csm_1b_local(model_path: str, device: str = "cuda", audio_num_codebooks
         # --- ALIGNMENT: Determine target dtype and cast model globally during device move ---
         logger.info(f"Moving loaded model to target device: {target_device} and casting global dtype...")
         # Determine target dtype based on device and support
-        if target_device.type == 'cuda':
-            if torch.cuda.is_bf16_supported():
-                target_dtype = torch.bfloat16
-                logger.info("Targeting bfloat16 dtype (CUDA).")
-            else:
-                target_dtype = torch.float16 # Fallback to float16 if bf16 not supported
-                logger.info("Targeting float16 dtype (CUDA, bf16 not supported).")
-        else: # CPU
-            target_dtype = torch.float32 # Use float32 for CPU
-            logger.info("Targeting float32 dtype (CPU).")
+        # --- FORCE FLOAT32 ---
+        target_dtype = torch.float32
+        logger.warning(f"FORCING FLOAT32 dtype ({target_device.type}).")
+        # --- END FORCE FLOAT32 ---
+        # if target_device.type == 'cuda':
+        #     if torch.cuda.is_bf16_supported():
+        #         target_dtype = torch.bfloat16
+        #         logger.info("Targeting bfloat16 dtype (CUDA).")
+        #     else:
+        #         target_dtype = torch.float16 # Fallback to float16 if bf16 not supported
+        #         logger.info("Targeting float16 dtype (CUDA, bf16 not supported).")
+        # else: # CPU
+        #     target_dtype = torch.float32 # Use float32 for CPU
+        #     logger.info("Targeting float32 dtype (CPU).")
 
         # Move model to target device AND set its global default dtype
         model = model.to(device=target_device, dtype=target_dtype)
