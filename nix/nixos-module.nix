@@ -83,6 +83,7 @@ in
         #  DB_PASS = "game";
         SECRET = cfg.secret;
         LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib;/run/opengl-driver/lib";
+        CUDA_PATH = "${pkgs.cudaPackages_12_4.cudatoolkit}";
         MODELSDIR = "/models";
         DATADIR = "/ai-panel-data";
       };
