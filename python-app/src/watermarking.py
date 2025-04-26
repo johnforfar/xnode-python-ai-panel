@@ -1,5 +1,3 @@
-# ./python-app/src/watermarking.py
-
 import argparse
 
 import silentcipher

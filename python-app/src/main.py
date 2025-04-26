@@ -50,7 +50,7 @@ logger.info("Application logger initialized (main.py). Console handler set to IN
 
 # --- Application Imports ---
 from generator import load_csm_1b_local
-from sesame_tts import SesameTTS
+from tts import TTS
 
 # --- RE-IMPORT UAGENTS ---
 from uagents import Agent, Bureau, Context, Model as UagentsModel
@@ -134,24 +134,7 @@ class PanelManager:
         self.bureau = None      # Bureau instance
 
         # --- Initialize TTS ---
-        self.tts_device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Attempting to initialize SesameTTS class on device: {self.tts_device}")
-        local_model_base_path = Path(models_dir())
-        try:
-            logger.info(f"Instantiating SesameTTS, targeting model path: {local_model_base_path} and device: {self.tts_device}")
-            self.tts = SesameTTS(device=self.tts_device, model_dir=str(local_model_base_path))
-            if self.tts.tts_available:
-                 self.tts_generator = self.tts.generator
-                 self.sample_rate = self.tts.sample_rate
-                 self.tts_available = True
-                 logger.info(f"SesameTTS wrapper initialized successfully. Sample Rate: {self.sample_rate}")
-            else: raise RuntimeError("SesameTTS wrapper indicated TTS failed to load.")
-        except Exception as e:
-            logger.error(f"Failed to instantiate SesameTTS wrapper: {str(e)}", exc_info=True)
-            # Handle TTS failure gracefully
-            self.tts = None
-            self.tts_generator = None
-            self.tts_available = False
+        self.tts = TTS()
         # --- End TTS Initialization ---
 
         # --- Agent Speaker and Prompt Maps ---
@@ -308,7 +291,7 @@ class PanelManager:
             "address": agent_address,
             "text": text,
             "timestamp": timestamp,
-            "audioStatus": "generating" if self.tts_available else "failed",
+            "audioStatus": "generating",
             "audioUrl": None,
         }
         self.history.append(message_payload)
@@ -318,11 +301,8 @@ class PanelManager:
         await self.broadcast_message({"type": message_type, "payload": message_payload})
 
         # Trigger background audio generation
-        if self.tts_available:
-            logger.info(f"Creating background task for TTS generation for {timestamp}")
-            asyncio.create_task(self.generate_and_broadcast_audio(message_payload))
-        else:
-            logger.warning(f"TTS not available, skipping audio generation task for {timestamp}.")
+        logger.info(f"Creating background task for TTS generation for {timestamp}")
+        asyncio.create_task(self.generate_and_broadcast_audio(message_payload))
 
 
         # --- FIX: Check limit AFTER processing debater response ---
@@ -341,23 +321,10 @@ class PanelManager:
         text = message_payload["text"]
         timestamp = message_payload["timestamp"]
 
-        # Use the check within the self.tts instance now
-        if not self.tts or not self.tts.tts_available:
-            logger.warning(f"TTS not available, skipping audio for {timestamp}.")
-            update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
-            await self.broadcast_message({"type": "audio_update", "payload": update_payload})
-            return
-
         speaker_id = self.agent_speaker_map.get(agent_name, 0) # Get speaker ID from map
         logger.info(f"Generating audio via SesameTTS wrapper for msg [{timestamp}], speaker {speaker_id}...")
 
-        # Call the method on the self.tts instance
-        # Ensure the output directory is correct ('static/audio')
-        mp3_filepath_str = await self.tts.generate_audio_and_convert(
-            text,
-            speaker_id,
-            output_dir="static/audio"
-        )
+        mp3_filepath_str = await self.tts.generate_audio(text,speaker_id)
 
         if mp3_filepath_str:
             mp3_filepath = Path(mp3_filepath_str)
