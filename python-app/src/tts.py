@@ -100,7 +100,7 @@ class TTS:
         output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
         torchaudio.save(
             output,
-            audio_tensor.cpu(),
+            torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
             self.generator.sample_rate
         )
         return output
