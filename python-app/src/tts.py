@@ -92,7 +92,7 @@ class TTS:
         audio_tensor = self.generator.generate(
             text=text,
             speaker=speaker_id,
-            context=[self.prompt_segments[-1]] + self.generated_segments,
+            context=self.prompt_segments + [self.generated_segments[-1]],
             max_audio_length_ms=30_000,
         )
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))

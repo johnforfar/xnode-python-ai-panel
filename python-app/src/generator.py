@@ -136,7 +136,7 @@ class Generator:
         curr_tokens_mask = prompt_tokens_mask.unsqueeze(0)
         curr_pos = torch.arange(0, prompt_tokens.size(0)).unsqueeze(0).long().to(self.device)
 
-        max_seq_len = 4096
+        max_seq_len = 2048
         max_context_len = max_seq_len - max_generation_len
         if curr_tokens.size(1) >= max_context_len:
             raise ValueError(
