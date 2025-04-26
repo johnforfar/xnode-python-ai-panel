@@ -301,7 +301,7 @@ class PanelManager:
 
         # Trigger background audio generation
         logger.info(f"Creating background task for TTS generation for {timestamp}")
-        self.generate_and_broadcast_audio(message_payload)
+        asyncio.create_task(self.generate_and_broadcast_audio(message_payload))
 
 
         # --- FIX: Check limit AFTER processing debater response ---
