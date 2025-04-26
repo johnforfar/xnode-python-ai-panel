@@ -323,7 +323,7 @@ class PanelManager:
         speaker_id = self.agent_speaker_map.get(agent_name, 0) # Get speaker ID from map
         logger.info(f"Generating audio via SesameTTS wrapper for msg [{timestamp}], speaker {speaker_id}...")
 
-        mp3_filepath_str = await self.tts.generate_audio(text,speaker_id)
+        mp3_filepath_str = self.tts.generate_audio(text,speaker_id)
 
         if mp3_filepath_str:
             mp3_filepath = Path(mp3_filepath_str)
