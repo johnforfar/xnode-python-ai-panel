@@ -49,7 +49,6 @@ logger = logging.getLogger(__name__)
 logger.info("Application logger initialized (main.py). Console handler set to INFO.")
 
 # --- Application Imports ---
-from generator import load_csm_1b_local
 from tts import TTS
 
 # --- RE-IMPORT UAGENTS ---
