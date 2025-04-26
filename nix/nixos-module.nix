@@ -86,6 +86,7 @@ in
         CUDA_PATH = "${pkgs.cudaPackages_12_4.cudatoolkit}";
         MODELSDIR = "/models";
         DATADIR = "/ai-panel-data";
+        NO_TORCH_COMPILE = "1";
       };
       serviceConfig = {
         ExecStart = "${lib.getExe xnode-python-ai-panel-backend}";
