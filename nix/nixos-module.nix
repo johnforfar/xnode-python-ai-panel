@@ -89,8 +89,8 @@ in
       };
       serviceConfig = {
         ExecStart = "${lib.getExe xnode-python-ai-panel-backend}";
-        User = "ai-panel-backend";
-        Group = "ai-panel-backend";
+        User = "root";
+        Group = "root";
         WorkingDirectory = "/ai-panel-data";
         Restart = "on-failure";
       };
