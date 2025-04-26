@@ -69,24 +69,40 @@ class TTS:
         # Load model
         self.generator = load_csm_1b(device)
 
-        # Prepare prompts
-        prompt_a = prepare_prompt(
-            SPEAKER_PROMPTS["conversational_a"]["text"],
-            0,
-            SPEAKER_PROMPTS["conversational_a"]["audio"],
-            self.generator.sample_rate
-        )
-
-        prompt_b = prepare_prompt(
-            SPEAKER_PROMPTS["conversational_b"]["text"],
-            1,
-            SPEAKER_PROMPTS["conversational_b"]["audio"],
-            self.generator.sample_rate
-        )
-
         # Generate each utterance
         self.generated_segments = []
-        self.prompt_segments = [prompt_a, prompt_b]
+        self.prompt_segments = [
+            prepare_prompt(
+                SPEAKER_PROMPTS["conversational_b"]["text"],
+                0,
+                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                self.generator.sample_rate
+            ),
+            prepare_prompt(
+                SPEAKER_PROMPTS["conversational_b"]["text"],
+                1,
+                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                self.generator.sample_rate
+            ),
+            prepare_prompt(
+                SPEAKER_PROMPTS["conversational_b"]["text"],
+                2,
+                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                self.generator.sample_rate
+            ),
+            prepare_prompt(
+                SPEAKER_PROMPTS["conversational_b"]["text"],
+                3,
+                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                self.generator.sample_rate
+            ),
+            prepare_prompt(
+                SPEAKER_PROMPTS["conversational_b"]["text"],
+                4,
+                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                self.generator.sample_rate
+            ),
+        ]
 
     def generate_audio(self, text, speaker_id):
         print(f"Generating: {text}")

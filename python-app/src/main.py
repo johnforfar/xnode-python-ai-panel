@@ -84,11 +84,11 @@ You are Kxi, the moderator. Your role is to guide the debate smoothly.
 # --- Define Agents List with Speaker IDs ---
 # Speaker IDs: Saylor=0, Kai=4, Vivi=14, Nn=2, Kxi=7
 AGENTS_CONFIG = [
-    {"name": "Kxi",            "prompt": KXI_PROMPT,    "speaker_id": 7, "port": 8000, "is_moderator": True}, # Moderator on main port
-    {"name": "Michael Saylor", "prompt": SAYLOR_PROMPT, "speaker_id": 0, "port": 8001, "is_moderator": False},
-    {"name": "Kai",            "prompt": KAI_PROMPT,    "speaker_id": 4, "port": 8002, "is_moderator": False},
-    {"name": "Vivi",           "prompt": VIVI_PROMPT,   "speaker_id": 14,"port": 8003, "is_moderator": False},
-    {"name": "Nn",             "prompt": NN_PROMPT,     "speaker_id": 2, "port": 8004, "is_moderator": False},
+    {"name": "Kxi",            "prompt": KXI_PROMPT,    "speaker_id": 0, "port": 8000, "is_moderator": True}, # Moderator on main port
+    {"name": "Michael Saylor", "prompt": SAYLOR_PROMPT, "speaker_id": 1, "port": 8001, "is_moderator": False},
+    {"name": "Kai",            "prompt": KAI_PROMPT,    "speaker_id": 2, "port": 8002, "is_moderator": False},
+    {"name": "Vivi",           "prompt": VIVI_PROMPT,   "speaker_id": 3,"port": 8003, "is_moderator": False},
+    {"name": "Nn",             "prompt": NN_PROMPT,     "speaker_id": 4, "port": 8004, "is_moderator": False},
 ]
 
 # Create Agent Instances using uagents
