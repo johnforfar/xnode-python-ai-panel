@@ -192,7 +192,6 @@ class PanelManager:
         self.num_agents = len(DEBATER_AGENTS) # Number of debaters
         self.websockets = set()
         self.bureau_task = None # Task handle for Bureau
-        self.bureau = None      # Bureau instance
 
         # --- Initialize TTS ---
         self.tts = TTS()
@@ -212,6 +211,13 @@ class PanelManager:
         self.max_messages = 12 # Max debater responses
         # --- End Increase ---
         self.current_debater_index = 0 # To track whose turn it is
+
+        bureau_port = 8005 # Use a different port for the bureau itself
+        logger.info(f"Initializing Bureau with http server on port {bureau_port}")
+        self.bureau = Bureau(port=bureau_port)
+        for agent_name, agent_instance in agents_dict.items():
+            logger.info(f"Adding agent {agent_name} (Address: {agent_instance.address}) to Bureau.")
+            self.bureau.add(agent_instance)
 
     # --- WebSocket Methods (unchanged) ---
     async def add_websocket(self, websocket, remote_addr: str | None):
@@ -365,7 +371,6 @@ class PanelManager:
         logger.info(f"Creating background task for TTS generation for {timestamp}")
         asyncio.create_task(self.generate_and_broadcast_audio(message_payload))
 
-
         # --- FIX: Check limit AFTER processing debater response ---
         if not is_moderator and self.message_counter >= self.max_messages:
             logger.info(f"Reached message limit ({self.max_messages}). Stopping panel automatically.")
@@ -443,14 +448,6 @@ class PanelManager:
         await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
         # --- End FIX ---
 
-        # --- REINSTATE BUREAU ---
-        bureau_port = 8005 # Use a different port for the bureau itself
-        logger.info(f"Initializing Bureau with http server on port {bureau_port}")
-        self.bureau = Bureau(port=bureau_port)
-        for agent_name, agent_instance in agents_dict.items():
-            logger.info(f"Adding agent {agent_name} (Address: {agent_instance.address}) to Bureau.")
-            self.bureau.add(agent_instance)
-
         logger.info("Creating background task for Bureau run_async.")
         # --- FIX: Use run_async() for integration ---
         self.bureau_task = asyncio.create_task(self.bureau.run_async())
@@ -489,7 +486,6 @@ class PanelManager:
             except Exception as e:
                 logger.error(f"Exception while awaiting cancelled Bureau task: {e}")
         self.bureau_task = None
-        self.bureau = None
         # --- End Stop Bureau ---
 
         self.history.append({ "agent": "System", "address": "system", "text": "AI Panel discussion stopped.", "timestamp": datetime.utcnow().isoformat() + "Z", "audioStatus": "failed"})
