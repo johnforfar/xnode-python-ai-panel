@@ -244,7 +244,7 @@ class PanelManager:
         if message_data["type"] != "audio":
             logger.info(f"Broadcasting message to {len(self.websockets)} clients (excluding sender: {exclude_sender is not None}): {message_data}")
             
-        message_json = base64.b64encode(bytes(json.dumps(message_data), "utf-8"))
+        message_json = base64.b64encode(bytes(json.dumps(message_data), "utf-8")).decode('ascii')
         tasks = []
         closed_sockets = []
 
