@@ -522,6 +522,7 @@ export default function Home() {
   };
 
   console.log(audioPlayer?.debug());
+  console.log(mediaRecorder);
 
   // --- Render ---
   return (
