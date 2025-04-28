@@ -78,7 +78,6 @@ export class AudioPlayer {
 
         // Connect to destination and play
         source.connect(this.output);
-        source.connect(this.audioContext.destination);
         source.start(0);
         source.onended = resolve;
       } catch (err) {
