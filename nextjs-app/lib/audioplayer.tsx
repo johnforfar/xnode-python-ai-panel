@@ -4,6 +4,7 @@ export class AudioPlayer {
   private queue: Float32Array[] = [];
   private audioContext = new AudioContext();
   private playing = false;
+  private output = this.audioContext.createMediaStreamDestination();
 
   public queueFragment(fragment: Float32Array) {
     this.queue.push(fragment);
@@ -16,8 +17,8 @@ export class AudioPlayer {
     return this.playing;
   }
 
-  public stream() {
-    return this.audioContext.createMediaStreamDestination().stream;
+  public getStream() {
+    return this.output.stream;
   }
 
   public debug() {
@@ -75,6 +76,7 @@ export class AudioPlayer {
         source.buffer = audioBuffer;
 
         // Connect to destination and play
+        source.connect(this.output);
         source.connect(this.audioContext.destination);
         source.start(0);
         source.onended = resolve;

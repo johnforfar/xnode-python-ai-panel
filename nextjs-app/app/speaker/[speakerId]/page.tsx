@@ -43,7 +43,7 @@ export default function SpeakerPage() {
       return undefined;
     }
 
-    return new MediaRecorder(audioPlayer.stream());
+    return new MediaRecorder(audioPlayer.getStream());
   }, [audioPlayer]);
 
   useEffect(() => {
