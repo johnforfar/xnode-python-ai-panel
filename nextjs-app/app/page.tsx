@@ -387,7 +387,9 @@ export default function Home() {
               console.log(
                 `Received audio chunk for ${message.payload.speaker}`
               );
-              audioPlayer.queueFragment(message.payload.chunk);
+              audioPlayer.queueFragment(
+                new Float32Array(message.payload.chunk)
+              );
               break;
             default:
               // Keep warning for truly unknown types
