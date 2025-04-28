@@ -4,7 +4,7 @@ import torchaudio
 from huggingface_hub import hf_hub_download
 from env import data_dir
 import re
-from stream_csm import Generator, Segment, load_csm_1b
+from generator import Segment, load_csm_1b
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
