@@ -60,51 +60,50 @@ export class AudioPlayer {
   }
 
   private async playAudioChunk(audioData: QueuedAudio, sampleRate: number) {
-    console.log(
-      `Playing next fragment at ${new Date(
-        audioData.playAt * 1000
-      ).toTimeString()}`
-    );
-    return new Promise((resolve) =>
-      setTimeout(resolve, Math.max(0, audioData.playAt * 1000 - Date.now()))
-    ).then(
-      () =>
-        new Promise(async (resolve, reject) => {
+    const delay = audioData.playAt * 1000 - Date.now();
+
+    if (delay > 0) {
+      await new Promise((resolve) => {
+        console.log(`Playing next fragment in ${delay}ms`);
+        setTimeout(resolve, delay);
+      });
+    }
+
+    await new Promise(async (resolve, reject) => {
+      try {
+        // Automatically resume audio context if suspended
+        if (this.audioContext.state === "suspended") {
           try {
-            // Automatically resume audio context if suspended
-            if (this.audioContext.state === "suspended") {
-              try {
-                console.log("Resuming audio context automatically");
-                await this.audioContext.resume();
-                console.log("Audio context resumed:", this.audioContext.state);
-              } catch (err) {
-                console.warn("Could not resume audio context:", err);
-              }
-            }
-
-            // Create buffer
-            const audioBuffer = this.audioContext.createBuffer(
-              1, // mono
-              audioData.data.length,
-              sampleRate
-            );
-
-            // Fill buffer with data
-            audioBuffer.copyToChannel(audioData.data, 0);
-
-            // Create source
-            const source = this.audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-
-            // Connect to destination and play
-            source.connect(this.output);
-            source.connect(this.audioContext.destination);
-            source.start(0);
-            source.onended = resolve;
+            console.log("Resuming audio context automatically");
+            await this.audioContext.resume();
+            console.log("Audio context resumed:", this.audioContext.state);
           } catch (err) {
-            console.error("Audio playback error:", err);
+            console.warn("Could not resume audio context:", err);
           }
-        })
-    );
+        }
+
+        // Create buffer
+        const audioBuffer = this.audioContext.createBuffer(
+          1, // mono
+          audioData.data.length,
+          sampleRate
+        );
+
+        // Fill buffer with data
+        audioBuffer.copyToChannel(audioData.data, 0);
+
+        // Create source
+        const source = this.audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // Connect to destination and play
+        source.connect(this.output);
+        source.connect(this.audioContext.destination);
+        source.start(0);
+        source.onended = resolve;
+      } catch (err) {
+        console.error("Audio playback error:", err);
+      }
+    });
   }
 }
