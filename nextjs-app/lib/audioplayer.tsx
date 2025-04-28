@@ -67,6 +67,8 @@ export class AudioPlayer {
         console.log(`Playing next fragment in ${delay}ms`);
         setTimeout(resolve, delay);
       });
+    } else {
+      console.log(`Playing fragment ${delay}ms late`);
     }
 
     await new Promise(async (resolve, reject) => {
