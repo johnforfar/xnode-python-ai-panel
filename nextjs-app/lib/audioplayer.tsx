@@ -26,6 +26,7 @@ export class AudioPlayer {
       queue: this.queue,
       audioContext: this.audioContext,
       playing: this.playing,
+      output: this.output,
     };
   }
 

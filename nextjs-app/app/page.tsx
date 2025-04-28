@@ -78,11 +78,16 @@ export default function Home() {
   // --- Added: WebSocket State ---
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
   const ws = useRef<WebSocket | null>(null); // Ref to hold the WebSocket instance
-  // *** ADD STATE TO GUARD AGAINST STRICT MODE DOUBLE EFFECT RUN ***
-  const [wsConnectAttempted, setWsConnectAttempted] = useState(false);
   // --- ADDED TTS State ---
   const recorder = useAudioRecorder();
   // --- End TTS State ---
+  const mediaRecorder = useMemo(() => {
+    if (!audioPlayer) {
+      return undefined;
+    }
+
+    return new MediaRecorder(audioPlayer.getStream());
+  }, [audioPlayer]);
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
@@ -657,13 +662,13 @@ export default function Home() {
                 height={50}
               />
             )}
-            {/* {audioPlayer && (
+            {mediaRecorder && (
               <LiveAudioVisualizer
-                mediaRecorder={audioPlayer}
+                mediaRecorder={mediaRecorder}
                 width={500}
                 height={50}
               />
-            )} */}
+            )}
           </div>
           {/* Messages container */}
           <ScrollArea className="flex-1">

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
-import { cn } from "@/lib/utils"; // Assuming utils setup from the main app
 import { LiveAudioVisualizer } from "react-audio-visualize"; // Re-added import
 import { AudioPlayer } from "@/lib/audioplayer";
 
@@ -90,7 +89,7 @@ export default function SpeakerPage() {
         // Listen for activity (speaker_activity or audio_update)
         switch (message.type) {
           case "audio":
-            if (message.payload.speaker === parseInt(speakerId)) {
+            if (message.payload.speaker === parseInt(speakerId) - 1) {
               audioPlayer.queueFragment(
                 new Float32Array(message.payload.chunk)
               );
