@@ -18,7 +18,7 @@ export class AudioPlayer {
 
   public queueFragment(playAt: number, fragment: Float32Array) {
     console.log(
-      `Received fragment to play at ${new Date(playAt).toTimeString()}`
+      `Received fragment to play at ${new Date(playAt * 1000).toTimeString()}`
     );
     this.queue.push({ playAt, data: fragment });
     if (!this.playing) {
@@ -65,16 +65,16 @@ export class AudioPlayer {
   private async playAudioChunk(audioData: QueuedAudio, sampleRate: number) {
     const delay = audioData.playAt * 1000 - Date.now();
 
-    if (delay > 0) {
-      await new Promise((resolve) => {
-        console.log(`Playing next fragment in ${delay}ms`);
-        setTimeout(resolve, delay);
-      });
-    } else {
-      console.log(`Playing fragment ${delay}ms late`);
-    }
+    // if (delay > 0) {
+    //   await new Promise((resolve) => {
+    //     console.log(`Playing next fragment in ${delay}ms`);
+    //     setTimeout(resolve, delay);
+    //   });
+    // } else {
+    //   console.log(`Playing fragment ${delay}ms late`);
+    // }
 
-    await new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         // Automatically resume audio context if suspended
         if (this.audioContext.state === "suspended") {
