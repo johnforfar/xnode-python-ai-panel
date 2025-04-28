@@ -13,10 +13,13 @@ export class AudioPlayer {
   private recorder = new MediaRecorder(this.output.stream);
 
   constructor() {
-    this.recorder.start();
+    // this.recorder.start();
   }
 
   public queueFragment(playAt: number, fragment: Float32Array) {
+    console.log(
+      `Received fragment to play at ${new Date(playAt).toTimeString()}`
+    );
     this.queue.push({ playAt, data: fragment });
     if (!this.playing) {
       this.processAudioPlaybackQueue().catch(console.error);
@@ -99,7 +102,7 @@ export class AudioPlayer {
         source.buffer = audioBuffer;
 
         // Connect to destination and play
-        source.connect(this.output);
+        // source.connect(this.output);
         source.connect(this.audioContext.destination);
         source.start(0);
         source.onended = resolve;

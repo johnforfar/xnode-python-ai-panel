@@ -8,6 +8,7 @@ from generator import Segment, load_csm_1b
 import asyncio
 import numpy as np
 import time
+from datetime import datetime
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
@@ -95,8 +96,6 @@ class TTS:
         self.playAt = 0
 
     async def generate_audio(self, text, speaker_id, broadcast_message):
-        print(f"Generating: {text}")
-
         current_time = int(time.time()) 
         self.playAt = max(current_time + 10, self.playAt) # Set to current time (if lower than playAt)
         if current_time > self.playAt + 10:
