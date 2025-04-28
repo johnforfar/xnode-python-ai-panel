@@ -515,8 +515,6 @@ export default function Home() {
     );
   };
 
-  console.log(audioPlayer?.debug());
-
   // --- Render ---
   return (
     <>
