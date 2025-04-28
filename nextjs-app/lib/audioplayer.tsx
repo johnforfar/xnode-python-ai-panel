@@ -41,6 +41,9 @@ export class AudioPlayer {
 
     try {
       this.playing = true;
+      if (this.recorder.state !== "recording") {
+        this.recorder.start();
+      }
       await this.playAudioChunk(nextChunk, 24000);
     } catch (err) {
       console.error("Error playing audio chunk:", err);
@@ -82,7 +85,6 @@ export class AudioPlayer {
         source.connect(this.output);
         source.connect(this.audioContext.destination);
         source.start(0);
-        this.recorder.start();
         source.onended = resolve;
       } catch (err) {
         console.error("Audio playback error:", err);
