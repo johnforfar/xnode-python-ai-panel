@@ -122,5 +122,5 @@ class TTS:
             torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
             self.generator.sample_rate
         )
-        self.playAt += len(audio_chunks) * 0.08 + 0.5 # Wait 0.08s per fragment + 0.5s between fragments
+        self.playAt += len(audio_chunks) * 0.16 + 0.5 # Wait 0.16s per fragment + 0.5s between fragments
         return output
