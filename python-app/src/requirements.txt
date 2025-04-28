@@ -10,3 +10,4 @@ silentcipher @ git+https://github.com/SesameAILabs/silentcipher@master
 fastapi
 aiohttp
 aiohttp-cors
+numpy==1.26.0
