@@ -7,6 +7,10 @@ export class AudioPlayer {
   private output = this.audioContext.createMediaStreamDestination();
   private recorder = new MediaRecorder(this.output.stream);
 
+  constructor() {
+    this.recorder.start();
+  }
+
   public queueFragment(fragment: Float32Array) {
     this.queue.push(fragment);
     if (!this.playing) {
@@ -41,9 +45,6 @@ export class AudioPlayer {
 
     try {
       this.playing = true;
-      if (this.recorder.state !== "recording") {
-        this.recorder.start();
-      }
       await this.playAudioChunk(nextChunk, 24000);
     } catch (err) {
       console.error("Error playing audio chunk:", err);
