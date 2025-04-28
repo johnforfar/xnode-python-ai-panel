@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import { useAudioRecorder } from "react-audio-voice-recorder";
 import { Mic, Square } from "lucide-react";
+import Link from 'next/link';
 
 // Define types for conversation messages (Adjust if backend format differs)
 interface ConversationMessage {
@@ -40,6 +41,15 @@ type WsConnectionStatus =
   | "closing"
   | "closed"
   | "error";
+
+// Define speaker data mapping - including inspiration
+const speakerPanelData: { [key: string]: { id: string, name: string; inspiration: string; image: string } } = {
+  "1": { id: "1", name: "Kxi", inspiration: "Moderator", image: "/1.jpg" },
+  "2": { id: "2", name: "Liq", inspiration: "Michael Saylor", image: "/2.jpg" },
+  "3": { id: "3", name: "Kai", inspiration: "Peter Schiff", image: "/3.jpg" },
+  "4": { id: "4", name: "Vivi", inspiration: "Satoshi Nakamoto", image: "/4.jpg" },
+  "5": { id: "5", name: "Nn", inspiration: "Donald Trump", image: "/5.jpg" },
+};
 
 export default function Home() {
   // --- State Declarations ---
@@ -670,7 +680,8 @@ export default function Home() {
       <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#1B2538] to-[#0F172A] text-white">
         {/* Header */}
         <header className="w-full border-b border-[#454545] py-4 bg-[#0F172A] sticky top-0 z-10 px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          {/* Top Row: Title, Status, Main Controls */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
             {/* Title */}
             <h1 className="text-xl font-bold text-white">
               AI Panel Discussion
@@ -768,9 +779,31 @@ export default function Home() {
               {/* --- End Auto-Play Toggle --- */}
             </div>
           </div>
+
+          {/* --- ADDED: Second Row: Speaker Buttons --- */}
+          <div className="flex flex-wrap justify-center items-center gap-3 mt-2 border-t border-[#454545] pt-4">
+             {Object.values(speakerPanelData).map((speaker) => (
+                 <Link
+                    key={speaker.id}
+                    href={`/speaker/${speaker.id}`}
+                    passHref // Necessary for external links or custom components
+                    legacyBehavior // Required when nesting `<a>` inside `<Link>` for `target="_blank"`
+                 >
+                   <a
+                     target="_blank" // Open in new tab
+                     rel="noopener noreferrer" // Security best practice
+                     className="px-3 py-1.5 text-sm bg-blue-600 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+                   >
+                     {speaker.id} - {speaker.name} ({speaker.inspiration})
+                   </a>
+                 </Link>
+             ))}
+          </div>
+          {/* --- End Speaker Buttons Row --- */}
+
           {/* Error Display */}
           {error && (
-            <div className="text-center text-red-400 text-sm mt-2 bg-red-900/30 border border-red-500/50 p-2 rounded">
+            <div className="text-center text-red-400 text-sm mt-4 bg-red-900/30 border border-red-500/50 p-2 rounded">
               Error: {error}
             </div>
           )}
