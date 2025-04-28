@@ -387,7 +387,7 @@ export default function Home() {
               );
               audioPlayer.queueFragment(
                 message.payload.playAt,
-                new Float32Array(message.payload.chunk)
+                message.payload.chunk
               );
               break;
             default:

@@ -85,7 +85,7 @@ export default function SpeakerPage() {
             if (message.payload.speaker === parseInt(speakerId) - 1) {
               audioPlayer.queueFragment(
                 message.payload.playAt,
-                new Float32Array(message.payload.chunk)
+                message.payload.chunk
               );
             }
         }

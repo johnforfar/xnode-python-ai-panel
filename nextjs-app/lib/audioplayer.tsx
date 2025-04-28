@@ -2,7 +2,7 @@
 
 export interface QueuedAudio {
   playAt: number;
-  data: AudioBufferSourceNode;
+  data: number[];
 }
 
 export class AudioPlayer {
@@ -16,28 +16,19 @@ export class AudioPlayer {
     this.recorder.start();
   }
 
-  public queueFragment(playAt: number, fragment: Float32Array) {
+  public queueFragment(playAt: number, fragment: number[]) {
     console.log(
-      `Received fragment to play at ${new Date(playAt * 1000).toTimeString()}`
+      `Received fragment to play at ${new Date(
+        playAt * 1000
+      ).toTimeString()} (${playAt * 1000 - Date.now()}ms from now)`
     );
-    // Create buffer
-    const audioBuffer = this.audioContext.createBuffer(
-      1, // mono
-      fragment.length,
-      24_000
-    );
-
-    // Fill buffer with data
-    audioBuffer.copyToChannel(fragment, 0);
-
-    // Create source
-    const source = this.audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-
-    source.connect(this.output);
-    source.connect(this.audioContext.destination);
-
-    this.queue.push({ playAt, data: source });
+    const nextUp = this.queue.at(-1);
+    if (nextUp) {
+      // Combine fragments to reduce overhead
+      nextUp.data.concat(fragment);
+    } else {
+      this.queue.push({ playAt, data: fragment });
+    }
 
     if (!this.playing) {
       this.processAudioPlaybackQueue().catch(console.error);
@@ -105,8 +96,25 @@ export class AudioPlayer {
           }
         }
 
+        const data = new Float32Array(audioData.data);
+
+        // Create buffer
+        const audioBuffer = this.audioContext.createBuffer(
+          1, // mono
+          data.length,
+          24_000
+        );
+
+        // Fill buffer with data
+        audioBuffer.copyToChannel(data, 0);
+
+        // Create source
+        const source = this.audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+
         // Connect to destination and play
-        const source = audioData.data;
+        source.connect(this.output);
+        source.connect(this.audioContext.destination);
         source.start(0);
         source.onended = resolve;
       } catch (err) {
