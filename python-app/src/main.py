@@ -192,6 +192,7 @@ class PanelManager:
         self.num_agents = len(DEBATER_AGENTS) # Number of debaters
         self.websockets = set()
         self.bureau_task = None # Task handle for Bureau
+        self.bureau = None      # Initialize Bureau as None here
 
         # --- Initialize TTS ---
         self.tts = TTS()
@@ -200,24 +201,26 @@ class PanelManager:
         # --- Agent Speaker and Prompt Maps ---
         self.agent_speaker_map = {agent["name"]: agent.get("speaker_id", 0) for agent in AGENTS_CONFIG}
         self.agent_prompt_map = {agent["name"]: agent["prompt"] for agent in AGENTS_CONFIG}
-        self.agent_address_map = {agent.name: agent.address for agent in agents_dict.values()} # Store addresses
+        # Agent addresses are globally defined, but maybe regenerate map in start? For now, keep.
+        self.agent_address_map = {agent.name: agent.address for agent in agents_dict.values()}
         logger.info(f"Agent Speaker ID Map: {self.agent_speaker_map}")
         logger.info(f"Agent Addresses: {self.agent_address_map}")
         # --- End Maps ---
 
         # --- Conversation Control ---
         self.message_counter = 0
-        # --- Increase Max Responses ---
-        self.max_messages = 12 # Max debater responses
-        # --- End Increase ---
-        self.current_debater_index = 0 # To track whose turn it is
+        self.max_messages = 12
+        self.current_debater_index = 0
 
-        bureau_port = 8005 # Use a different port for the bureau itself
-        logger.info(f"Initializing Bureau with http server on port {bureau_port}")
-        self.bureau = Bureau(port=bureau_port)
-        for agent_name, agent_instance in agents_dict.items():
-            logger.info(f"Adding agent {agent_name} (Address: {agent_instance.address}) to Bureau.")
-            self.bureau.add(agent_instance)
+        # --- REMOVE Bureau Initialization from __init__ ---
+        # bureau_port = 8005
+        # bureau_endpoint = f"http://127.0.0.1:{bureau_port}/submit"
+        # logger.info(f"Initializing Bureau with http server on port {bureau_port} and endpoint {bureau_endpoint}")
+        # self.bureau = Bureau(port=bureau_port, endpoint=[bureau_endpoint])
+        # for agent_name, agent_instance in agents_dict.items():
+        #     logger.info(f"Adding agent {agent_name} (Address: {agent_instance.address}) to Bureau.")
+        #     self.bureau.add(agent_instance)
+        # --- End REMOVE ---
 
     # --- WebSocket Methods (unchanged) ---
     async def add_websocket(self, websocket, remote_addr: str | None):
@@ -422,79 +425,109 @@ class PanelManager:
         if self.active:
             logger.warning("Start panel called but already active.")
             return False
+        # Ensure clean state before starting
+        if self.bureau_task and not self.bureau_task.done():
+             logger.warning("Start panel called but bureau_task seems active. Stopping first.")
+             await self.stop_panel()
+        if self.bureau is not None:
+             logger.warning("Start panel called but bureau instance exists. Resetting.")
+             self.bureau = None # Ensure bureau is None before recreating
 
-        logger.info("Starting panel with uAgents Bureau...")
+
+        logger.info("Starting panel: Initializing NEW uAgents Bureau instance...")
         self.active = True
         conversation_active = True # Set global flag for agent handlers
         self.status = "Starting Bureau..."
         self.message_counter = 0
         self.current_debater_index = 0
 
-        # --- Create list of names for the intro message ---
+        # --- Reset History and Broadcast ---
         debater_names_str = ", ".join([agent.name for agent in DEBATER_AGENTS])
         moderator_name_str = kxi_agent.name
         intro_participants = f"Featuring Moderator {moderator_name_str} and Debaters: {debater_names_str}"
-        # --- End Create names list ---
-
-        self.history = [{ # Initial system message
+        self.history = [{
             "agent": "System", "address": "system",
-            # --- Update text to include names ---
             "text": f"AI Panel: Crypto's Future. {intro_participants}. (Limit: {self.max_messages} debater responses)",
-            # --- End Update ---
             "timestamp": datetime.utcnow().isoformat() + "Z", "audioStatus": "failed"
         }]
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
-        # --- FIX: Send history immediately after reset ---
         await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
-        # --- End FIX ---
+        # --- End Reset ---
+
+
+        # --- MOVE Bureau Initialization HERE ---
+        bureau_port = 8005 # Use a different port for the bureau itself
+        bureau_endpoint = f"http://127.0.0.1:{bureau_port}/submit"
+        logger.info(f"Initializing NEW Bureau with http server on port {bureau_port} and endpoint {bureau_endpoint}")
+        self.bureau = Bureau(port=bureau_port, endpoint=[bureau_endpoint])
+        for agent_name, agent_instance in agents_dict.items():
+            # Make sure agent instances are the global ones defined outside the class
+            logger.info(f"Adding agent {agent_name} (Address: {agent_instance.address}) to NEW Bureau.")
+            self.bureau.add(agent_instance)
+        # --- End MOVE ---
+
 
         logger.info("Creating background task for Bureau run_async.")
-        # --- FIX: Use run_async() for integration ---
-        self.bureau_task = asyncio.create_task(self.bureau.run_async())
-        # --- End FIX ---
+        if self.bureau is None: # Should not happen after above init
+             logger.error("CRITICAL: Bureau instance is None just before creating task.")
+             return False
 
-        # Kxi agent will start the conversation via its startup event handler
+        # Create the task to run the *new* bureau instance
+        self.bureau_task = asyncio.create_task(self.bureau.run_async())
+
+        # Kxi agent's startup event *within this new bureau* should now fire correctly
 
         self.status = f"Panel Active ({self.num_agents} debaters)"
         await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
-        logger.info("Panel start sequence complete. Bureau running asynchronously.")
+        logger.info("Panel start sequence complete. New Bureau running asynchronously.")
         return True
 
     async def stop_panel(self):
         """Stops the uAgents Bureau and conversation."""
         global conversation_active
-        if not self.active:
-            logger.warning("Stop panel called but not active.")
+        if not self.active and (not self.bureau_task or self.bureau_task.done()):
+            logger.warning("Stop panel called but panel not active and no active task.")
             return False
 
         logger.info("Stopping panel (uAgents)...")
+        original_state_active = self.active
         self.active = False
-        conversation_active = False # Signal agents to stop
-        self.status = "Stopping Bureau..."
-        await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
+        conversation_active = False
 
-        # --- Stop Bureau ---
+        if original_state_active and self.status != "Stopping Bureau...":
+            self.status = "Stopping Bureau..."
+            await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
+
+        # --- Stop Bureau Task ---
+        bureau_stopped = False
         if self.bureau_task and not self.bureau_task.done():
             logger.info("Cancelling Bureau task...")
             self.bureau_task.cancel()
             try:
-                await asyncio.wait_for(self.bureau_task, timeout=2.0)
+                await asyncio.wait_for(self.bureau_task, timeout=3.0)
+                logger.info("Bureau task awaited successfully after cancellation.")
+                bureau_stopped = True
             except asyncio.CancelledError:
                 logger.info("Bureau task cancelled successfully.")
+                bureau_stopped = True
             except asyncio.TimeoutError:
-                 logger.warning("Timeout waiting for Bureau task to cancel.")
+                 logger.warning("Timeout waiting for Bureau task to cancel. Task might not have stopped cleanly.")
+                 bureau_stopped = True
             except Exception as e:
-                logger.error(f"Exception while awaiting cancelled Bureau task: {e}")
+                logger.error(f"Exception while awaiting cancelled Bureau task: {e}", exc_info=True)
+                bureau_stopped = True
+        else:
+            logger.info("No active Bureau task found to cancel or task already done.")
+            bureau_stopped = True
+
         self.bureau_task = None
-        # --- End Stop Bureau ---
+        # --- ADD BACK: Set Bureau instance to None after stopping ---
+        logger.info("Setting Bureau instance to None.")
+        self.bureau = None
+        # --- End ADD BACK ---
 
-        self.history.append({ "agent": "System", "address": "system", "text": "AI Panel discussion stopped.", "timestamp": datetime.utcnow().isoformat() + "Z", "audioStatus": "failed"})
-        self.status = "Idle"
-        await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
-        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
-        await self.broadcast_message({"type": "system_message", "payload": {"text": "Panel stopped."}})
-
-        logger.info("Panel stopped (uAgents).")
+        # ... (rest of stop_panel logic: append history, broadcast status/history/message) ...
+        logger.info("Panel stopped sequence complete (uAgents).")
         return True
 
 
@@ -506,10 +539,15 @@ logger.info("Global PanelManager instance created.")
 
 # Function to clean response (can be global or method if needed elsewhere)
 def extract_conversation(text: str) -> str:
-    # Basic cleaning
-    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    # Remove the unwanted prefix if present
+    prefix_pattern = r"^(Here's my response:)\s*"
+    cleaned = re.sub(prefix_pattern, '', text, flags=re.IGNORECASE).strip() # Use re.sub and ignore case
+
+    # Existing basic cleaning
+    cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL).strip()
     if cleaned.startswith('"') and cleaned.endswith('"'):
-        cleaned = cleaned[1:-1]
+        cleaned = cleaned[1:-1].strip() # Also strip after removing quotes
+
     # Add more cleaning if Ollama adds unwanted prefixes/suffixes
     return cleaned
 
@@ -517,43 +555,55 @@ def extract_conversation(text: str) -> str:
 @kxi_agent.on_event("startup")
 async def kxi_startup(ctx: Context):
     # This runs when the bureau starts the Kxi agent
-    logger.info(f"Moderator {ctx.agent.name} startup event.")
+    logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Startup event triggered.") # Log start
     # Check if the panel is intended to be active (via panel_manager)
     if panel_manager.active:
-        logger.info(f"{ctx.agent.name}: Panel active, getting opening statement...")
+        logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Panel active, attempting to get opening statement from Ollama...")
         # Get opening statement/question from Ollama
         opening_text = await panel_manager.get_ollama_response(ctx.agent.name, panel_manager.history)
+        logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Received response from Ollama: '{opening_text[:60]}...'") # Log response
 
         if opening_text.startswith("Error:"):
-             logger.error(f"Moderator failed to get opening: {opening_text}")
-             # Maybe broadcast system error?
-             await panel_manager.handle_single_message("System", f"Error starting conversation: {opening_text}")
+             logger.error(f"MODERATOR_STARTUP [{ctx.agent.name}]: Failed to get opening statement from Ollama: {opening_text}")
+             # FIX: Replace undefined function call with log
+             # await panel_manager.handle_single_message("System", f"Error starting conversation: {opening_text}")
+             logger.error(f"MODERATOR_STARTUP [{ctx.agent.name}]: Bypassing undefined 'handle_single_message'. Stopping panel due to Ollama error.")
              asyncio.create_task(panel_manager.stop_panel()) # Stop if moderator fails
              return
 
         # Handle moderator's own message (adds to history, broadcasts, triggers TTS)
+        logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Attempting to handle moderator's own opening message...")
         proceed = await panel_manager.handle_agent_response(ctx.agent.name, ctx.agent.address, opening_text)
+        logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: handle_agent_response returned: {proceed}")
 
         if proceed and conversation_active:
              # Send the *opening text* as the first message to the first debater
              first_debater_address = panel_manager.agent_address_map[DEBATER_AGENTS[0].name]
-             logger.info(f"{ctx.agent.name}: Sending opening message to {DEBATER_AGENTS[0].name} ({first_debater_address})")
-             await ctx.send(first_debater_address, Message(text=opening_text))
-        else:
-             logger.warning(f"{ctx.agent.name}: Panel stopped or handler indicated stop after opening message. Not sending to first debater.")
+             logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Attempting to send opening message to {DEBATER_AGENTS[0].name} ({first_debater_address})...")
+             try:
+                 await ctx.send(first_debater_address, Message(text=opening_text))
+                 logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Successfully sent opening message to {DEBATER_AGENTS[0].name}.") # Log success
+             except Exception as e:
+                 logger.error(f"MODERATOR_STARTUP [{ctx.agent.name}]: Failed to send opening message to {DEBATER_AGENTS[0].name}: {e}", exc_info=True)
+                 # Optionally broadcast error or stop panel here if needed later
+        elif not proceed:
+             logger.warning(f"MODERATOR_STARTUP [{ctx.agent.name}]: 'proceed' is False after handle_agent_response. Not sending to first debater.")
+        elif not conversation_active:
+            logger.warning(f"MODERATOR_STARTUP [{ctx.agent.name}]: 'conversation_active' is False after handle_agent_response. Not sending to first debater.")
     else:
-        logger.info(f"{ctx.agent.name}: Startup event fired, but panel_manager is not active. No initial message sent.")
+        logger.info(f"MODERATOR_STARTUP [{ctx.agent.name}]: Startup event fired, but panel_manager is not active. No action taken.")
 
 
 # --- Generic Debater Message Handler ---
 async def handle_debater_message(ctx: Context, sender: str, msg: Message, next_agent: Agent):
     agent_name = ctx.agent.name
-    logger.info(f"Debater {agent_name} received message from {sender}: '{msg.text[:50]}...'")
+    # Log entry into the handler
+    logger.info(f"DEBATER_HANDLER [{agent_name}]: Entered handle_debater_message. Received message from {sender}: '{msg.text[:50]}...'")
     if not conversation_active:
-        logger.info(f"{agent_name}: Conversation inactive, skipping processing.")
+        logger.info(f"DEBATER_HANDLER [{agent_name}]: Conversation inactive, skipping processing.")
         return
 
-    logger.info(f"{agent_name}: Calling PanelManager.get_ollama_response...")
+    logger.info(f"DEBATER_HANDLER [{agent_name}]: Calling PanelManager.get_ollama_response...")
     response_text = await panel_manager.get_ollama_response(agent_name, panel_manager.history)
 
     if response_text.startswith("Error:"):
@@ -565,18 +615,18 @@ async def handle_debater_message(ctx: Context, sender: str, msg: Message, next_a
         proceed = False # Don't send error messages as triggers
     else:
         cleaned_response = extract_conversation(response_text)
-        logger.info(f"{agent_name}: Calling PanelManager.handle_agent_response...")
+        logger.info(f"DEBATER_HANDLER [{agent_name}]: Calling PanelManager.handle_agent_response...")
         # Handle response first (adds to history, broadcasts, triggers TTS, checks limit)
         proceed = await panel_manager.handle_agent_response(agent_name, ctx.agent.address, cleaned_response)
 
     # Check if the panel is *still* active and if handler allows proceeding
     if proceed and conversation_active:
         next_agent_address = panel_manager.agent_address_map[next_agent.name]
-        logger.info(f"{agent_name}: Sending response to {next_agent.name} ({next_agent_address}).")
+        logger.info(f"DEBATER_HANDLER [{agent_name}]: Sending response to {next_agent.name} ({next_agent_address}).")
         # Send the *cleaned response* to the next agent
         await ctx.send(next_agent_address, Message(text=cleaned_response))
     else:
-        logger.info(f"{agent_name}: Panel stopped or handler indicated stop. Not sending reply to {next_agent.name}.")
+        logger.info(f"DEBATER_HANDLER [{agent_name}]: Panel stopped or handler indicated stop. Not sending reply to {next_agent.name}.")
 
 
 # --- Assign Handlers Dynamically ---
@@ -594,39 +644,73 @@ for i, current_agent in enumerate(DEBATER_AGENTS):
     current_agent.on_message(model=Message)(create_handler(next_agent))
 
 
-# --- WebSocket Handler (unchanged) ---
+# --- WebSocket Handler (Add More Robust Error Handling) ---
 async def websocket_handler(request):
     # global panel_manager # No longer needed
-    from aiohttp import web, WSMsgType
+    from aiohttp import web, WSMsgType # Keep local import if preferred
 
-    # *** Get remote address from the request object HERE ***
     remote_addr = request.remote
-    logger.info(f"--- ENTERING websocket_handler from {remote_addr} ---")
+    logger.info(f"WS_HANDLER [{remote_addr}]: --- ENTERING websocket_handler ---")
 
     ws = web.WebSocketResponse()
-    await ws.prepare(request)
+    try:
+        await ws.prepare(request)
+        logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket connection prepared.")
+    except Exception as e:
+        logger.error(f"WS_HANDLER [{remote_addr}]: Failed to prepare WebSocket connection: {e}", exc_info=True)
+        # Cannot return ws if prepare failed, maybe raise or return None/error response if framework allows
+        return web.Response(status=500, text="WebSocket preparation failed") # Example error return
 
-    # *** Pass the address string to add_websocket (or just log here) ***
-    # Let's modify add_websocket to accept it for better logging within the manager
+
+    # Pass the address string to add_websocket
     await panel_manager.add_websocket(ws, remote_addr)
+    logger.info(f"WS_HANDLER [{remote_addr}]: Added WebSocket to PanelManager.")
 
     try:
+        # Loop to receive messages FROM the client (currently none expected)
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                  data = msg.data
-                 logger.info(f"WS Received message: {data}")
-                 # Optional: Handle commands sent FROM frontend via WS
-                 # e.g., if data == 'start_panel': await panel_manager.start_panel(2)
+                 logger.info(f"WS_HANDLER [{remote_addr}]: Received TEXT message: {data}")
+                 # Optional: Handle commands sent FROM frontend via WS if needed later
+            elif msg.type == WSMsgType.BINARY:
+                 logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
+                 # Handle binary data if needed later
             elif msg.type == WSMsgType.ERROR:
-                logger.error(f'WebSocket connection closed with exception {ws.exception()}')
-                break # Exit loop on error
+                # This specifically catches WebSocket protocol errors
+                logger.error(f'WS_HANDLER [{remote_addr}]: WebSocket connection closed with exception {ws.exception()}', exc_info=ws.exception())
+                break # Exit loop on WebSocket error
+            elif msg.type == WSMsgType.CLOSED:
+                 logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket CLOSED message received.")
+                 break # Exit loop gracefully if client sends close frame
+            # Handle other types like PING/PONG if necessary
+            # elif msg.type == WSMsgType.PING:
+            #     await ws.pong()
+            # elif msg.type == WSMsgType.PONG:
+            #     logger.debug(f"WS_HANDLER [{remote_addr}]: Pong received.")
+
+    except asyncio.CancelledError:
+         # Catch task cancellation specifically
+         logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket handler task cancelled.")
+         # Should lead to finally block
     except Exception as e:
-         logger.error(f"Error during WebSocket communication from {remote_addr}: {e}", exc_info=True)
+         # Catch other unexpected errors during the receive loop
+         logger.error(f"WS_HANDLER [{remote_addr}]: Error during WebSocket receive loop: {e}", exc_info=True)
+         # Should lead to finally block
     finally:
-        logger.info(f'WebSocket connection closing for {remote_addr}...')
-        # *** Pass the address string to remove_websocket ***
-        panel_manager.remove_websocket(ws, remote_addr)
-        logger.info(f"--- EXITING websocket_handler for {remote_addr} ---")
-    return ws
+        # This block executes when the loop exits for ANY reason
+        # (normal close, error, cancellation, break)
+        logger.info(f'WS_HANDLER [{remote_addr}]: Entering finally block, connection closing...')
+        await panel_manager.remove_websocket(ws, remote_addr) # Ensure removal from manager
+        # Check if WS is already closing/closed before trying to close again
+        if not ws.closed:
+            logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket not closed yet, attempting graceful close.")
+            await ws.close(code=WSMsgType.CLOSE, message=b'Server shutdown')
+            logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket closed from finally block.")
+        else:
+             logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket already closed.")
+        logger.info(f"WS_HANDLER [{remote_addr}]: --- EXITING websocket_handler ---")
+
+    return ws # Return the response object
 
 # --- Removed __main__ block (should be run via app.py) ---
