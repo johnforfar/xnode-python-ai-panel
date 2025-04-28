@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import { useAudioRecorder } from "react-audio-voice-recorder";
 import { Mic, Square } from "lucide-react";
-import Link from 'next/link';
+import Link from "next/link";
 import { AudioPlayer } from "@/lib/audioplayer";
 
 // Define types for conversation messages (Adjust if backend format differs)
@@ -42,11 +42,23 @@ type WsConnectionStatus =
   | "error";
 
 // Define speaker data mapping - including inspiration
-const speakerPanelData: { [key: string]: { id: string, name: string; inspiration: string; image: string } } = {
+const speakerPanelData: {
+  [key: string]: {
+    id: string;
+    name: string;
+    inspiration: string;
+    image: string;
+  };
+} = {
   "1": { id: "1", name: "Kxi", inspiration: "Moderator", image: "/1.jpg" },
   "2": { id: "2", name: "Liq", inspiration: "Michael Saylor", image: "/2.jpg" },
   "3": { id: "3", name: "Kai", inspiration: "Peter Schiff", image: "/3.jpg" },
-  "4": { id: "4", name: "Vivi", inspiration: "Satoshi Nakamoto", image: "/4.jpg" },
+  "4": {
+    id: "4",
+    name: "Vivi",
+    inspiration: "Satoshi Nakamoto",
+    image: "/4.jpg",
+  },
   "5": { id: "5", name: "Nn", inspiration: "Donald Trump", image: "/5.jpg" },
 };
 
@@ -251,6 +263,11 @@ export default function Home() {
 
   // WebSocket Connection Effect
   useEffect(() => {
+    // Wait for audioplayer to initialize first
+    if (!audioPlayer) {
+      return;
+    }
+
     console.log("--- useEffect RUNNING ---");
 
     // --- Attempt to prevent double-run interference ---
@@ -370,9 +387,7 @@ export default function Home() {
               console.log(
                 `Received audio chunk for ${message.payload.speaker}`
               );
-              if (true) {
-                audioPlayer?.queueFragment(message.payload.chunk);
-              }
+              audioPlayer.queueFragment(message.payload.chunk);
               break;
             default:
               // Keep warning for truly unknown types
@@ -469,7 +484,7 @@ export default function Home() {
         }
       }
     };
-  }, []); // Keep empty dependency array
+  }, [audioPlayer]); // Keep empty dependency array
 
   // Scroll to bottom when conversation updates
   useEffect(() => {
@@ -594,22 +609,22 @@ export default function Home() {
 
           {/* --- ADDED: Second Row: Speaker Buttons --- */}
           <div className="flex flex-wrap justify-center items-center gap-3 mt-2 border-t border-[#454545] pt-4">
-             {Object.values(speakerPanelData).map((speaker) => (
-                 <Link
-                    key={speaker.id}
-                    href={`/speaker/${speaker.id}`}
-                    passHref // Necessary for external links or custom components
-                    legacyBehavior // Required when nesting `<a>` inside `<Link>` for `target="_blank"`
-                 >
-                   <a
-                     target="_blank" // Open in new tab
-                     rel="noopener noreferrer" // Security best practice
-                     className="px-3 py-1.5 text-sm bg-blue-600 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
-                   >
-                     {speaker.id} - {speaker.name} ({speaker.inspiration})
-                   </a>
-                 </Link>
-             ))}
+            {Object.values(speakerPanelData).map((speaker) => (
+              <Link
+                key={speaker.id}
+                href={`/speaker/${speaker.id}`}
+                passHref // Necessary for external links or custom components
+                legacyBehavior // Required when nesting `<a>` inside `<Link>` for `target="_blank"`
+              >
+                <a
+                  target="_blank" // Open in new tab
+                  rel="noopener noreferrer" // Security best practice
+                  className="px-3 py-1.5 text-sm bg-blue-600 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+                >
+                  {speaker.id} - {speaker.name} ({speaker.inspiration})
+                </a>
+              </Link>
+            ))}
           </div>
           {/* --- End Speaker Buttons Row --- */}
 
