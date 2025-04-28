@@ -10,22 +10,8 @@ import re
 from datetime import datetime
 import json
 import aiohttp
-import torch
-import random
-from env import models_dir, data_dir
+from env import data_dir
 import base64
-
-# --- Set Hugging Face Cache Environment Variables EARLY ---
-MODELS_DIR_ENV = Path(models_dir())
-MODELS_DIR_ENV.mkdir(exist_ok=True) # Ensure the base /models directory exists
-os.environ["HF_HOME"] = str(MODELS_DIR_ENV)
-os.environ["HUGGINGFACE_HUB_CACHE"] = str(MODELS_DIR_ENV)
-os.environ["TRANSFORMERS_CACHE"] = str(MODELS_DIR_ENV) # Also set TRANSFORMERS_CACHE
-# Optional: Disable internet check if you ONLY want local
-# os.environ["TRANSFORMERS_OFFLINE"] = "1"
-# os.environ["HF_DATASETS_OFFLINE"] = "1"
-print(f"INFO: HF_HOME/HUGGINGFACE_HUB_CACHE/TRANSFORMERS_CACHE set to: {MODELS_DIR_ENV}")
-# --- End Environment Variable Setup ---
 
 # --- Logging Setup (Keep as is) ---
 LOG_FILE = Path(data_dir()) / "logs.txt"
