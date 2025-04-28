@@ -81,13 +81,6 @@ export default function Home() {
   // --- ADDED TTS State ---
   const recorder = useAudioRecorder();
   // --- End TTS State ---
-  const mediaRecorder = useMemo(() => {
-    if (!audioPlayer) {
-      return undefined;
-    }
-
-    return new MediaRecorder(audioPlayer.getStream());
-  }, [audioPlayer]);
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
@@ -522,7 +515,6 @@ export default function Home() {
   };
 
   console.log(audioPlayer?.debug());
-  console.log(mediaRecorder);
 
   // --- Render ---
   return (
@@ -663,9 +655,9 @@ export default function Home() {
                 height={50}
               />
             )}
-            {mediaRecorder && (
+            {audioPlayer && (
               <LiveAudioVisualizer
-                mediaRecorder={mediaRecorder}
+                mediaRecorder={audioPlayer.getRecorder()}
                 width={500}
                 height={50}
               />

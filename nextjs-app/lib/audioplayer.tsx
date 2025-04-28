@@ -5,6 +5,7 @@ export class AudioPlayer {
   private audioContext = new AudioContext();
   private playing = false;
   private output = this.audioContext.createMediaStreamDestination();
+  private recorder = new MediaRecorder(this.output.stream);
 
   public queueFragment(fragment: Float32Array) {
     this.queue.push(fragment);
@@ -17,8 +18,8 @@ export class AudioPlayer {
     return this.playing;
   }
 
-  public getStream() {
-    return this.output.stream;
+  public getRecorder() {
+    return this.recorder;
   }
 
   public debug() {
@@ -27,6 +28,7 @@ export class AudioPlayer {
       audioContext: this.audioContext,
       playing: this.playing,
       output: this.output,
+      recorder: this.recorder,
     };
   }
 
@@ -80,6 +82,7 @@ export class AudioPlayer {
         source.connect(this.output);
         source.connect(this.audioContext.destination);
         source.start(0);
+        this.recorder.start();
         source.onended = resolve;
       } catch (err) {
         console.error("Audio playback error:", err);

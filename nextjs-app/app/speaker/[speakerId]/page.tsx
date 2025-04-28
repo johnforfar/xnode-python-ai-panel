@@ -37,13 +37,6 @@ export default function SpeakerPage() {
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
-  const mediaRecorder = useMemo(() => {
-    if (!audioPlayer) {
-      return undefined;
-    }
-
-    return new MediaRecorder(audioPlayer.getStream());
-  }, [audioPlayer]);
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
@@ -184,9 +177,9 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
-          {mediaRecorder && (
+          {audioPlayer && (
             <LiveAudioVisualizer
-              mediaRecorder={mediaRecorder}
+              mediaRecorder={audioPlayer.getRecorder()}
               width={500} // Adjust width as needed
               height={75} // Adjust height as needed
               barWidth={3}
