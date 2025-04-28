@@ -115,7 +115,7 @@ export class AudioPlayer {
         // Connect to destination and play
         source.connect(this.output);
         source.connect(this.audioContext.destination);
-        console.log("Start Fragment");
+        console.log("Start Fragment", data);
         source.start(0);
         source.onended = () => {
           console.log("Finish Fragment");

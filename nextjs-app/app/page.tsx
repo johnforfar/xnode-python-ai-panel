@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import { useAudioRecorder } from "react-audio-voice-recorder";
-import { Mic, Square } from "lucide-react";
 import Link from "next/link";
 import { AudioPlayer } from "@/lib/audioplayer";
 
@@ -78,9 +77,6 @@ export default function Home() {
   // --- Added: WebSocket State ---
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
   const ws = useRef<WebSocket | null>(null); // Ref to hold the WebSocket instance
-  // --- ADDED TTS State ---
-  const recorder = useAudioRecorder();
-  // --- End TTS State ---
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
@@ -646,27 +642,7 @@ export default function Home() {
               Error: {error}
             </div>
           )}
-        </header>
-
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex flex-col w-full place-items-center m-2">
-            <button
-              onClick={() =>
-                recorder.isRecording
-                  ? recorder.stopRecording()
-                  : recorder.startRecording()
-              }
-            >
-              {recorder.isRecording ? <Square /> : <Mic />}
-            </button>
-            {recorder.mediaRecorder && (
-              <LiveAudioVisualizer
-                mediaRecorder={recorder.mediaRecorder}
-                width={500}
-                height={50}
-              />
-            )}
             {audioPlayer && (
               <LiveAudioVisualizer
                 mediaRecorder={audioPlayer.getRecorder()}
@@ -675,6 +651,10 @@ export default function Home() {
               />
             )}
           </div>
+        </header>
+
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Messages container */}
           <ScrollArea className="flex-1">
             <div className="px-6 py-4">
