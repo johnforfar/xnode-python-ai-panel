@@ -5,32 +5,18 @@ from huggingface_hub import hf_hub_download
 from generator import load_csm_1b, Segment
 from env import data_dir
 import re
+from stream_csm import Generator
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
 
 # Default prompts are available at https://hf.co/sesame/csm-1b
-prompt_filepath_conversational_a = hf_hub_download(
-    repo_id="sesame/csm-1b",
-    filename="prompts/conversational_a.wav"
-)
 prompt_filepath_conversational_b = hf_hub_download(
     repo_id="sesame/csm-1b",
     filename="prompts/conversational_b.wav"
 )
 
 SPEAKER_PROMPTS = {
-    "conversational_a": {
-        "text": (
-            "like revising for an exam I'd have to try and like keep up the momentum because I'd "
-            "start really early I'd be like okay I'm gonna start revising now and then like "
-            "you're revising for ages and then I just like start losing steam I didn't do that "
-            "for the exam we had recently to be fair that was a more of a last minute scenario "
-            "but like yeah I'm trying to like yeah I noticed this yesterday that like Mondays I "
-            "sort of start the day with this not like a panic but like a"
-        ),
-        "audio": prompt_filepath_conversational_a
-    },
     "conversational_b": {
         "text": (
             "like a super Mario level. Like it's very like high detail. And like, once you get "
@@ -67,7 +53,8 @@ class TTS:
         print(f"Using device: {device}")
 
         # Load model
-        self.generator = load_csm_1b(device)
+        self.model = load_csm_1b(device)
+        self.generator = Generator(self.model)
 
         # Generate each utterance
         self.generated_segments = []
@@ -76,43 +63,47 @@ class TTS:
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 0,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.generator.sample_rate
+                self.model.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 1,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.generator.sample_rate
+                self.model.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 2,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.generator.sample_rate
+                self.model.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 3,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.generator.sample_rate
+                self.model.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 4,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.generator.sample_rate
+                self.model.sample_rate
             ),
         ]
 
-    def generate_audio(self, text, speaker_id):
+    def generate_audio(self, text, speaker_id, broadcast_message):
         print(f"Generating: {text}")
-        audio_tensor = self.generator.generate(
-            text=re.sub(r'[:;"]', '', text), # Remove : ; " characters as they mess up the speech
+        audio_chunks = []
+        for chunk in self.generator.generate_stream(
+            text=re.sub(r'[:;"*]| -', '', text), # Remove : ; " * -(with a space in front) characters as they mess up the speech
             speaker=speaker_id,
             # Only add this speakers prompt and last message to context
             context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
             max_audio_length_ms=30_000,
-        )
+        ):
+            broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "chunk": chunk}})
+            audio_chunks.append(chunk)
+        audio_tensor = torch.cat(audio_chunks)
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
 
         output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
