@@ -239,7 +239,9 @@ class PanelManager:
             # logger.info("Broadcast: No active WebSocket clients.") # Can be noisy
             return
 
-        logger.info(f"Broadcasting message to {len(self.websockets)} clients (excluding sender: {exclude_sender is not None}): {message_data}")
+        # Logging audio fragments is very intense
+        if message_data["type"] != "audio":
+            logger.info(f"Broadcasting message to {len(self.websockets)} clients (excluding sender: {exclude_sender is not None}): {message_data}")
         message_json = json.dumps(message_data)
         tasks = []
         closed_sockets = []
