@@ -7,10 +7,17 @@ export class AudioPlayer {
 
   public queueFragment(fragment: Float32Array) {
     this.queue.push(fragment);
-    console.log("Fragment", fragment, "added to queue");
     if (!this.playing) {
       this.processAudioPlaybackQueue().catch(console.error);
     }
+  }
+
+  public isPlaying() {
+    return this.playing;
+  }
+
+  public stream() {
+    return this.audioContext.createMediaStreamDestination().stream;
   }
 
   public debug() {
@@ -27,12 +34,6 @@ export class AudioPlayer {
       this.playing = false;
       return;
     }
-    console.log(
-      "Chunk",
-      nextChunk,
-      "removed from queue. Queue left: ",
-      this.queue
-    );
 
     try {
       this.playing = true;
