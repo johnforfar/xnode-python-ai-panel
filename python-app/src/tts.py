@@ -97,7 +97,7 @@ class TTS:
     def generate_audio(self, text, speaker_id, broadcast_message):
         print(f"Generating: {text}")
 
-        self.playAt = max(int(time.time()), self.playAt) # Set to current time (if lower than playAt)
+        self.playAt = max(int(time.time()) + 5, self.playAt) # Set to current time (if lower than playAt)
 
         audio_chunks = []
         for chunk in self.generator.generate_stream(
@@ -120,5 +120,5 @@ class TTS:
             torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
             self.generator.sample_rate
         )
-        self.playAt += 0.2 # Wait 0.2s between fragments
+        self.playAt += 0.5 # Wait 0.5s between fragments
         return output
