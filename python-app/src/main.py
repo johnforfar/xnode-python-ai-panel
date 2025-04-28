@@ -382,7 +382,7 @@ class PanelManager:
         if not is_moderator and self.message_counter >= self.max_messages:
             logger.info(f"Reached message limit ({self.max_messages}). Stopping panel automatically.")
             # Use create_task to avoid blocking the agent handler
-            asyncio.create_task(self.stop_panel())
+            await self.stop_panel()
             return False # Signal to agent handler not to send next message
 
         return True # Signal to agent handler to proceed (send next message)

@@ -1,6 +1,5 @@
 import os
 import sys
-import asyncio
 import logging
 from aiohttp import web
 import aiohttp_cors
@@ -8,72 +7,10 @@ from datetime import datetime
 import json
 from pathlib import Path
 from env import data_dir
-import torch
-import torchaudio
-import torchtune
-import subprocess
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
 logger = logging.getLogger(__name__)
-logger.info("--- app.py: Script Start ---")
-
-# --- Add Version Logging ---
-logger.info("--- Library and System Versions ---")
-logger.info(f"Python Executable: {sys.executable}")
-logger.info(f"Python Version: {sys.version}")
-
-# --- PyTorch and CUDA Checks ---
-logger.info(f"PyTorch Version: {torch.__version__}")
-logger.info(f"Torchaudio Version: {torchaudio.__version__}")
-try:
-    logger.info(f"Torchtune Version: {torchtune.__version__ if hasattr(torchtune, '__version__') else 'Unknown (check pkg_resources)'}")
-except NameError:
-    logger.warning("Torchtune module not found or version attribute missing.")
-
-# Detailed CUDA Checks
-logger.info(f"CUDA available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    logger.info(f"CUDA version PyTorch was compiled with: {torch.version.cuda}")
-    num_gpus = torch.cuda.device_count()
-    logger.info(f"Number of GPUs: {num_gpus}")
-    for i in range(num_gpus):
-        logger.info(f"  GPU {i}: Name={torch.cuda.get_device_name(i)}, Capability={torch.cuda.get_device_capability(i)}")
-    # Check bfloat16 support
-    if torch.cuda.is_bf16_supported():
-        logger.info("bfloat16 is supported on the current CUDA device(s).")
-    else:
-        logger.info("bfloat16 is NOT supported on the current CUDA device(s).")
-else:
-    logger.info("CUDA is not available to PyTorch.")
-# --- End PyTorch and CUDA Checks ---
-
-
-# --- nvidia-smi Check (already exists, keeping it) ---
-if torch.cuda.is_available(): # Only run nvidia-smi if CUDA is reported available by Torch
-    try:
-        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, check=False) # Use check=False to avoid crash if command fails
-        if result.returncode == 0:
-            logger.info("--- nvidia-smi Output ---")
-            # Log first few lines to avoid flooding, adjust as needed
-            for i, line in enumerate(result.stdout.splitlines()):
-                if i < 15: # Log ~15 lines of nvidia-smi
-                     logger.info(f"NVIDIA-SMI: {line}")
-                elif i == 15:
-                     logger.info("NVIDIA-SMI: ... (output truncated)")
-                     break
-            logger.info("--- End nvidia-smi Output ---")
-        else:
-             logger.warning(f"nvidia-smi command executed but returned error code {result.returncode}. Stderr: {result.stderr.strip()}")
-    except FileNotFoundError:
-        logger.warning("nvidia-smi command not found. Cannot get driver version.")
-    except Exception as e:
-        logger.error(f"An error occurred while running nvidia-smi: {e}", exc_info=True)
-# --- End nvidia-smi Check ---
-
-logger.info("-----------------------------------")
-# --- End Version Logging ---
-
 
 # --- Import PanelManager INSTANCE, and websocket_handler from main.py ---
 try:
