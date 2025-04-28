@@ -705,7 +705,7 @@ async def websocket_handler(request):
         # This block executes when the loop exits for ANY reason
         # (normal close, error, cancellation, break)
         logger.info(f'WS_HANDLER [{remote_addr}]: Entering finally block, connection closing...')
-        await panel_manager.remove_websocket(ws, remote_addr) # Ensure removal from manager
+        panel_manager.remove_websocket(ws, remote_addr) # Ensure removal from manager
         # Check if WS is already closing/closed before trying to close again
         if not ws.closed:
             logger.info(f"WS_HANDLER [{remote_addr}]: WebSocket not closed yet, attempting graceful close.")

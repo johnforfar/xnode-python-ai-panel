@@ -100,20 +100,20 @@ class TTS:
         self.playAt = max(int(time.time()) + 5, self.playAt) # Set to current time (if lower than playAt)
 
         audio_chunks = []
-        for chunk in self.generator.generate_stream(
+        for audio_chunk in self.generator.generate_stream(
             text=re.sub(r'[:;"*]| -', '', text), # Remove : ; " * -(with a space in front) characters as they mess up the speech
             speaker=speaker_id,
             # Only add this speakers prompt and last message to context
             context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
             max_audio_length_ms=30_000,
         ):
-            chunk = chunk.cpu().numpy().astype(np.float32).tolist()
+            chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
             asyncio.create_task(broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt, "chunk": chunk}}))
             self.playAt += len(chunk) / 24000 # samples / sample rate
-            audio_chunks.append(chunk)
+            audio_chunks.append(audio_chunk)
         audio_tensor = torch.cat(audio_chunks)
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
-        
+
         output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
         torchaudio.save(
             output,
