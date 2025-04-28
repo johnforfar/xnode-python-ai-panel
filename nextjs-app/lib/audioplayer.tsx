@@ -25,7 +25,7 @@ export class AudioPlayer {
     const nextUp = this.queue.at(-1);
     if (nextUp) {
       // Combine fragments to reduce overhead
-      nextUp.data.concat(fragment);
+      nextUp.data = nextUp.data.concat(fragment);
     } else {
       this.queue.push({ playAt, data: fragment });
     }
