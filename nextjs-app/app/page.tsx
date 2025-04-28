@@ -386,6 +386,7 @@ export default function Home() {
                 `Received audio chunk for ${message.payload.speaker}`
               );
               audioPlayer.queueFragment(
+                message.payload.playAt,
                 new Float32Array(message.payload.chunk)
               );
               break;

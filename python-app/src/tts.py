@@ -7,6 +7,7 @@ import re
 from generator import Segment, load_csm_1b
 import asyncio
 import numpy as np
+import time
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
@@ -91,8 +92,13 @@ class TTS:
             ),
         ]
 
+        self.playAt = 0
+
     def generate_audio(self, text, speaker_id, broadcast_message):
         print(f"Generating: {text}")
+
+        self.playAt = max(int(time.time()), self.playAt) # Set to current time (if lower than playAt)
+
         audio_chunks = []
         for chunk in self.generator.generate_stream(
             text=re.sub(r'[:;"*]| -', '', text), # Remove : ; " * -(with a space in front) characters as they mess up the speech
@@ -101,7 +107,9 @@ class TTS:
             context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
             max_audio_length_ms=30_000,
         ):
-            asyncio.create_task(broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "chunk": chunk.cpu().numpy().astype(np.float32).tolist()}}))
+            chunk = chunk.cpu().numpy().astype(np.float32).tolist()
+            asyncio.create_task(broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt, "chunk": chunk}}))
+            self.playAt += len(chunk) / 24000 # samples / sample rate
             audio_chunks.append(chunk)
         audio_tensor = torch.cat(audio_chunks)
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
@@ -112,4 +120,5 @@ class TTS:
             torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
             self.generator.sample_rate
         )
+        self.playAt += 0.2 # Wait 0.2s between fragments
         return output
