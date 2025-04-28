@@ -22,7 +22,7 @@ export class AudioPlayer {
         playAt * 1000
       ).toTimeString()} (${playAt * 1000 - Date.now()}ms from now)`
     );
-    const nextUp = this.queue.at(-1);
+    const nextUp = this.queue.at(2);
     if (nextUp) {
       // Combine fragments to reduce overhead
       nextUp.data = nextUp.data.concat(fragment);
@@ -115,8 +115,12 @@ export class AudioPlayer {
         // Connect to destination and play
         source.connect(this.output);
         source.connect(this.audioContext.destination);
+        console.log("Start Fragment");
         source.start(0);
-        source.onended = resolve;
+        source.onended = () => {
+          console.log("Finish Fragment");
+          resolve(undefined);
+        };
       } catch (err) {
         console.error("Audio playback error:", err);
       }
