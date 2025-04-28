@@ -94,7 +94,7 @@ class TTS:
 
         self.playAt = 0
 
-    def generate_audio(self, text, speaker_id, broadcast_message):
+    async def generate_audio(self, text, speaker_id, broadcast_message):
         print(f"Generating: {text}")
 
         self.playAt = max(int(time.time()) + 15, self.playAt) # Set to current time (if lower than playAt)
@@ -108,7 +108,7 @@ class TTS:
             max_audio_length_ms=30_000,
         ):
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
-            asyncio.create_task(broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt, "chunk": chunk}}))
+            await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt, "chunk": chunk}})
             audio_chunks.append(audio_chunk)
         audio_tensor = torch.cat(audio_chunks)
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
