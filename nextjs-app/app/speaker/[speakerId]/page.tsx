@@ -125,14 +125,6 @@ export default function SpeakerPage() {
     };
   }, [speakerId, speakerInfo]); // Added isSpeaking dependency to potentially update console logs
 
-  if (!speakerInfo) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-        Loading speaker...
-      </div>
-    );
-  }
-
   const [isPlaying, setIsPlaying] = useState(false);
   useEffect(() => {
     if (!audioPlayer) {
@@ -141,6 +133,14 @@ export default function SpeakerPage() {
 
     setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 100);
   }, [audioPlayer]);
+
+  if (!speakerInfo) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+        Loading speaker...
+      </div>
+    );
+  }
 
   return (
     // Use a relative container for absolute positioning of overlays

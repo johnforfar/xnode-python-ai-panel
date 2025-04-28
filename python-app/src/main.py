@@ -11,6 +11,10 @@ from tts import TTS
 from uagents import Agent, Bureau, Context, Model as UagentsModel
 
 # --- Logging Setup (Keep as is) ---
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(console_handler)
+logging.getLogger().setLevel(logging.INFO)
 logging.getLogger("transformers").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
