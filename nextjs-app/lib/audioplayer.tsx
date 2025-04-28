@@ -56,6 +56,7 @@ export class AudioPlayer {
   private async processAudioPlaybackQueue() {
     const nextChunk = this.queue.shift();
     if (!nextChunk) {
+      console.log("No more chunks to play, stopping...");
       this.playing = false;
       return;
     }
@@ -68,7 +69,7 @@ export class AudioPlayer {
     }
 
     // Continue with next chunk
-    this.processAudioPlaybackQueue();
+    this.processAudioPlaybackQueue().catch(console.error);
   }
 
   private async playAudioChunk(audioData: QueuedAudio) {
@@ -115,10 +116,15 @@ export class AudioPlayer {
         // Connect to destination and play
         source.connect(this.output);
         source.connect(this.audioContext.destination);
-        console.log("Start Fragment", data);
+        console.log(
+          "Start Fragment",
+          Date.now(),
+          "estimated finish",
+          Date.now() + source.buffer.duration
+        );
         source.start(0);
         source.onended = () => {
-          console.log("Finish Fragment");
+          console.log("Finish Fragment", Date.now());
           resolve(undefined);
         };
       } catch (err) {
