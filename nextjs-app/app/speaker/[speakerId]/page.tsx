@@ -77,7 +77,7 @@ export default function SpeakerPage() {
 
     socket.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data);
+        const message = JSON.parse(atob(event.data));
 
         // Listen for activity (speaker_activity or audio_update)
         switch (message.type) {

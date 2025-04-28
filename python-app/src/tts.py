@@ -113,7 +113,7 @@ class TTS:
             audio_chunks.append(chunk)
         audio_tensor = torch.cat(audio_chunks)
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
-
+        
         output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
         torchaudio.save(
             output,

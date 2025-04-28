@@ -13,6 +13,7 @@ import aiohttp
 import torch
 import random
 from env import models_dir, data_dir
+import base64
 
 # --- Set Hugging Face Cache Environment Variables EARLY ---
 MODELS_DIR_ENV = Path(models_dir())
@@ -242,7 +243,8 @@ class PanelManager:
         # Logging audio fragments is very intense
         if message_data["type"] != "audio":
             logger.info(f"Broadcasting message to {len(self.websockets)} clients (excluding sender: {exclude_sender is not None}): {message_data}")
-        message_json = json.dumps(message_data)
+            
+        message_json = base64.b64encode(json.dumps(message_data))
         tasks = []
         closed_sockets = []
 
@@ -395,7 +397,7 @@ class PanelManager:
         speaker_id = self.agent_speaker_map.get(agent_name, 0) # Get speaker ID from map
         logger.info(f"Generating audio via SesameTTS wrapper for msg [{timestamp}], speaker {speaker_id}...")
 
-        mp3_filepath_str = self.tts.generate_audio(text,speaker_id,self.broadcast_message)
+        mp3_filepath_str = self.tts.generate_audio(text, speaker_id, self.broadcast_message)
 
         if mp3_filepath_str:
             mp3_filepath = Path(mp3_filepath_str)

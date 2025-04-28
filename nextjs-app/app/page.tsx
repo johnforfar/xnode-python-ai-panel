@@ -321,7 +321,7 @@ export default function Home() {
     socket.onmessage = (event) => {
       if (ws.current === socket) {
         try {
-          const message = JSON.parse(event.data);
+          const message = JSON.parse(atob(event.data));
           console.log("WebSocket message received:", message);
 
           switch (message.type) {
