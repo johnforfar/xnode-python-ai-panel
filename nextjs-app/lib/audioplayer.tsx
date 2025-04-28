@@ -2,7 +2,7 @@
 
 export interface QueuedAudio {
   playAt: number;
-  data: Float32Array;
+  data: AudioBufferSourceNode;
 }
 
 export class AudioPlayer {
@@ -13,14 +13,32 @@ export class AudioPlayer {
   private recorder = new MediaRecorder(this.output.stream);
 
   constructor() {
-    // this.recorder.start();
+    this.recorder.start();
   }
 
   public queueFragment(playAt: number, fragment: Float32Array) {
     console.log(
       `Received fragment to play at ${new Date(playAt * 1000).toTimeString()}`
     );
-    this.queue.push({ playAt, data: fragment });
+    // Create buffer
+    const audioBuffer = this.audioContext.createBuffer(
+      1, // mono
+      fragment.length,
+      24_000
+    );
+
+    // Fill buffer with data
+    audioBuffer.copyToChannel(fragment, 0);
+
+    // Create source
+    const source = this.audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+
+    source.connect(this.output);
+    source.connect(this.audioContext.destination);
+
+    this.queue.push({ playAt, data: source });
+
     if (!this.playing) {
       this.processAudioPlaybackQueue().catch(console.error);
     }
@@ -53,7 +71,7 @@ export class AudioPlayer {
 
     try {
       this.playing = true;
-      await this.playAudioChunk(nextChunk, 24000);
+      await this.playAudioChunk(nextChunk);
     } catch (err) {
       console.error("Error playing audio chunk:", err);
     }
@@ -62,19 +80,19 @@ export class AudioPlayer {
     this.processAudioPlaybackQueue();
   }
 
-  private async playAudioChunk(audioData: QueuedAudio, sampleRate: number) {
+  private async playAudioChunk(audioData: QueuedAudio) {
     const delay = audioData.playAt * 1000 - Date.now();
 
-    // if (delay > 0) {
-    //   await new Promise((resolve) => {
-    //     console.log(`Playing next fragment in ${delay}ms`);
-    //     setTimeout(resolve, delay);
-    //   });
-    // } else {
-    //   console.log(`Playing fragment ${delay}ms late`);
-    // }
+    if (delay > 0) {
+      await new Promise((resolve) => {
+        console.log(`Playing next fragment in ${delay}ms`);
+        setTimeout(resolve, delay);
+      });
+    } else {
+      console.log(`Playing fragment ${delay}ms late`);
+    }
 
-    return new Promise(async (resolve, reject) => {
+    await new Promise(async (resolve, reject) => {
       try {
         // Automatically resume audio context if suspended
         if (this.audioContext.state === "suspended") {
@@ -87,23 +105,8 @@ export class AudioPlayer {
           }
         }
 
-        // Create buffer
-        const audioBuffer = this.audioContext.createBuffer(
-          1, // mono
-          audioData.data.length,
-          sampleRate
-        );
-
-        // Fill buffer with data
-        audioBuffer.copyToChannel(audioData.data, 0);
-
-        // Create source
-        const source = this.audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-
         // Connect to destination and play
-        // source.connect(this.output);
-        source.connect(this.audioContext.destination);
+        const source = audioData.data;
         source.start(0);
         source.onended = resolve;
       } catch (err) {

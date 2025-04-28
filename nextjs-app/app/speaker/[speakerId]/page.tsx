@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { LiveAudioVisualizer } from "react-audio-visualize"; // Re-added import
@@ -133,6 +133,15 @@ export default function SpeakerPage() {
     );
   }
 
+  const [isPlaying, setIsPlaying] = useState(false);
+  useEffect(() => {
+    if (!audioPlayer) {
+      return;
+    }
+
+    setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 100);
+  }, [audioPlayer]);
+
   return (
     // Use a relative container for absolute positioning of overlays
     <main className="relative min-h-screen w-full font-sans overflow-hidden text-white">
@@ -155,7 +164,7 @@ export default function SpeakerPage() {
       <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
         <span>
           WS: {wsStatus} | ID: {speakerId} | Name: {speakerInfo?.name} |
-          Speaking: {audioPlayer?.isPlaying() ? "Yes" : "No"}
+          Speaking: {isPlaying ? "Yes" : "No"}
         </span>
       </div>
 

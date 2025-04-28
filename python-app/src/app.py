@@ -3,26 +3,14 @@ import sys
 import logging
 from aiohttp import web
 import aiohttp_cors
-from datetime import datetime
 import json
 from pathlib import Path
 from env import data_dir
+from main import panel_manager, websocket_handler
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
 logger = logging.getLogger(__name__)
-
-# --- Import PanelManager INSTANCE, and websocket_handler from main.py ---
-try:
-    from main import panel_manager, websocket_handler # Import only necessary items
-    logger.info("Successfully imported panel_manager instance and websocket_handler from main.py")
-except ImportError as e:
-    logger.critical(f"Could not import from main.py. {e}", exc_info=True)
-    sys.exit(1)
-except Exception as e:
-    logger.critical(f"An unexpected error occurred during import from main.py: {e}", exc_info=True)
-    sys.exit(1)
-
 
 # --- API Handlers (Use imported panel_manager instance) ---
 

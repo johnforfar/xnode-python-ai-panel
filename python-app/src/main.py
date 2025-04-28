@@ -1,8 +1,3 @@
-import os
-app_dir = os.path.dirname(__file__)
-os.chdir(app_dir)
-print(f"INFO: Changed working directory to: {os.getcwd()}")
-
 from pathlib import Path
 import logging
 import asyncio
@@ -12,21 +7,11 @@ import json
 import aiohttp
 from env import data_dir
 import base64
+from tts import TTS
+from uagents import Agent, Bureau, Context, Model as UagentsModel
 
 # --- Logging Setup (Keep as is) ---
-LOG_FILE = Path(data_dir()) / "logs.txt"
-try:
-    with open(LOG_FILE, 'w') as f: f.write("--- Log Start ---\n")
-    file_handler = logging.FileHandler(LOG_FILE, mode='a')
-    log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s] %(message)s')
-    file_handler.setFormatter(log_formatter)
-    file_handler.setLevel(logging.INFO)
-    logging.getLogger().addHandler(file_handler)
-    print(f"INFO: Logging configured to file: {LOG_FILE}")
-except Exception as e:
-    print(f"ERROR: Failed to configure file logging to {LOG_FILE}: {e}")
 console_handler = logging.StreamHandler()
-console_handler.setFormatter(log_formatter)
 console_handler.setLevel(logging.INFO)
 logging.getLogger().addHandler(console_handler)
 logging.getLogger().setLevel(logging.INFO)
@@ -34,15 +19,6 @@ logging.getLogger("transformers").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.info("Application logger initialized (main.py). Console handler set to INFO.")
-
-# --- Application Imports ---
-from tts import TTS
-
-# --- RE-IMPORT UAGENTS ---
-from uagents import Agent, Bureau, Context, Model as UagentsModel
-# --- End Re-import ---
-
-# --- Constants / Config ---
 
 # --- Define Prompts ---
 LIQ_PROMPT = """
