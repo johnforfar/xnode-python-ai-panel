@@ -2,10 +2,9 @@ import os
 import torch
 import torchaudio
 from huggingface_hub import hf_hub_download
-from generator import load_csm_1b, Segment
 from env import data_dir
 import re
-from stream_csm import Generator
+from stream_csm import Generator, Segment, load_csm_1b
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
@@ -53,8 +52,7 @@ class TTS:
         print(f"Using device: {device}")
 
         # Load model
-        self.model = load_csm_1b(device)
-        self.generator = Generator(self.model)
+        self.generator = load_csm_1b(device)
 
         # Generate each utterance
         self.generated_segments = []
@@ -63,31 +61,31 @@ class TTS:
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 0,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.model.sample_rate
+                self.generator.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 1,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.model.sample_rate
+                self.generator.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 2,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.model.sample_rate
+                self.generator.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 3,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.model.sample_rate
+                self.generator.sample_rate
             ),
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_b"]["text"],
                 4,
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
-                self.model.sample_rate
+                self.generator.sample_rate
             ),
         ]
 
