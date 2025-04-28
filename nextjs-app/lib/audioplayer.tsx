@@ -60,6 +60,11 @@ export class AudioPlayer {
   }
 
   private async playAudioChunk(audioData: QueuedAudio, sampleRate: number) {
+    console.log(
+      `Playing next fragment at ${new Date(
+        audioData.playAt * 1000
+      ).toTimeString()}`
+    );
     return new Promise((resolve) =>
       setTimeout(resolve, Math.max(0, audioData.playAt * 1000 - Date.now()))
     ).then(

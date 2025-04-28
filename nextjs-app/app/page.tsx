@@ -610,6 +610,19 @@ export default function Home() {
 
           {/* --- ADDED: Second Row: Speaker Buttons --- */}
           <div className="flex flex-wrap justify-center items-center gap-3 mt-2 border-t border-[#454545] pt-4">
+            <button
+              onClick={() => {
+                Object.values(speakerPanelData).forEach((speaker, i) => {
+                  window.open(
+                    `${window.location.href}/speaker/${speaker.id}`,
+                    speaker.name,
+                    `left=${384 * i},width=384,height=1080`
+                  );
+                });
+              }}
+            >
+              Open All
+            </button>
             {Object.values(speakerPanelData).map((speaker) => (
               <Link
                 key={speaker.id}
