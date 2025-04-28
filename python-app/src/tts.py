@@ -5,6 +5,7 @@ from huggingface_hub import hf_hub_download
 from env import data_dir
 import re
 from generator import Segment, load_csm_1b
+import asyncio
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
@@ -99,7 +100,7 @@ class TTS:
             context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
             max_audio_length_ms=30_000,
         ):
-            broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "chunk": chunk}})
+            asyncio.create_task(broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "chunk": chunk}}))
             audio_chunks.append(chunk)
         audio_tensor = torch.cat(audio_chunks)
         self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
