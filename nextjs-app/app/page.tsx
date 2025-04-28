@@ -363,6 +363,7 @@ export default function Home() {
               if (true) {
                 audioPlayer?.queueFragment(message.payload.chunk);
               }
+              break;
             default:
               // Keep warning for truly unknown types
               console.warn(
@@ -487,6 +488,8 @@ export default function Home() {
       </div>
     );
   };
+
+  console.log(audioPlayer?.debug());
 
   // --- Render ---
   return (

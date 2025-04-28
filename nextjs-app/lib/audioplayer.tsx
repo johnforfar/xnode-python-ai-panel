@@ -12,6 +12,14 @@ export class AudioPlayer {
     }
   }
 
+  public debug() {
+    return {
+      queue: this.queue,
+      audioContext: this.audioContext,
+      playing: this.playing,
+    };
+  }
+
   private async processAudioPlaybackQueue() {
     const nextChunk = this.queue.shift();
     if (!nextChunk) {
