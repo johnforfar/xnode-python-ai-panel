@@ -68,9 +68,10 @@ class TTS:
                 self.generator.sample_rate
             ),
             prepare_prompt(
-                ("They almost seem alive. We did have to cut off a large portion of their carpet in order to transport him out of the building. "
-                "There was just no way we could physically get him to move without ripping off all what's left of his skin to the carpet, "
-                "which is leaving behind potential evidence."),
+                ("Corruption is everywhere, from patients using with staff members to staff members having affairs. "
+                "Before I got hired, the guy that interviewed me appeared to be under the influence of stimulants. "
+                "A lot of the patients that came in knew staff members because they were friends or maybe even they used together a long time ago. "
+                "And unfortunately, a lot of those workers relapsed."),
                 3,
                 f"{data_dir()}/voices/satoshi.wav",
                 self.generator.sample_rate
