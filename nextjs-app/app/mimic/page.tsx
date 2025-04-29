@@ -49,7 +49,8 @@ export default function SpeakerPage() {
     };
 
     recorder.mediaRecorder.onstop = (e) => {
-      new Promise((resolve) => setTimeout(resolve, 500)).then(() =>
+      // Small delay to make sure any data is processed
+      new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
         ws.current?.send(
           btoa(JSON.stringify({ type: "user_audio_end", payload: {} }))
         )

@@ -10,6 +10,7 @@ import base64
 from tts import TTS
 from uagents import Agent, Bureau, Context, Model as UagentsModel
 import wave
+import numpy as np
 
 # --- Logging Setup (Keep as is) ---
 console_handler = logging.StreamHandler()
@@ -650,7 +651,7 @@ async def websocket_handler(request):
                         panel_manager.mimic_wav.setsampwidth(2)  # 16-bit
                         panel_manager.mimic_wav.setframerate(24000) 
 
-                     panel_manager.mimic_wav.writeframes(data["payload"])
+                     panel_manager.mimic_wav.writeframes(data["payload"].numpy().astype(np.int16).tobytes())
                  if data["type"] == "user_audio_end":
                     panel_manager.mimic_wav.close()
                     panel_manager.mimic_wav = None
