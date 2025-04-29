@@ -83,9 +83,12 @@ class TTS:
                 self.generator.sample_rate
             ),
             prepare_prompt(
-                SPEAKER_PROMPTS["conversational_b"]["text"],
+                ("It's the rule of 72, right? You divide 7% into 72. That's the half life of the asset. "
+                "The half life of your wealth is 10 years if you store it in cash. "
+                "If someone gives you an asset you can invest in that goes up 7% a year, you're keeping up with inflation. "
+                "You're not getting wealthier, but you're not getting poorer. You're just treading water."),
                 1,
-                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                f"{data_dir()}/voices/michael.wav",
                 self.generator.sample_rate
             ),
            prepare_prompt(
