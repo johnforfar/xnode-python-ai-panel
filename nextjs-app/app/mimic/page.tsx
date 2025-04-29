@@ -25,19 +25,25 @@ export default function SpeakerPage() {
   const [audioRecorder, setAudioRecorder] = useState<AudioRecorder | undefined>(
     undefined
   );
+  const [echo, setEcho] = useState<boolean>(false);
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
   }, []);
 
   useEffect(() => {
-    if (!ws.current || !audioPlayer) {
+    if (!ws.current) {
       return;
     }
 
     const recorder = new AudioRecorder();
     recorder.init({
       onAudio: (audio) => {
+        if (echo) {
+          audioPlayer?.queueFragment(0, Array.from(audio));
+          return;
+        }
+
         ws.current?.send(
           btoa(
             JSON.stringify({
@@ -49,7 +55,7 @@ export default function SpeakerPage() {
       },
     });
     setAudioRecorder(recorder);
-  }, [ws.current, audioPlayer]);
+  }, [ws.current, audioPlayer, echo]);
 
   // WebSocket Connection Effect
   useEffect(() => {
@@ -123,7 +129,7 @@ export default function SpeakerPage() {
       }
       setWsStatus("closed");
     };
-  }, [speakerId, audioPlayer]); // Added isSpeaking dependency to potentially update console logs
+  }, [speakerId, audioPlayer]);
 
   const [isPlaying, setIsPlaying] = useState(false);
   useEffect(() => {
@@ -153,7 +159,8 @@ export default function SpeakerPage() {
       <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
         <span>
           WS: {wsStatus} | ID: {speakerId} | Speaking:{" "}
-          {isPlaying ? "Yes" : "No"}
+          {isPlaying ? "Yes" : "No"} |{" "}
+          <button onClick={() => setEcho(!echo)}>Toggle Echo</button>
         </span>
       </div>
 
