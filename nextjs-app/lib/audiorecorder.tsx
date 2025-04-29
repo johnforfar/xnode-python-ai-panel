@@ -10,6 +10,7 @@ export class AudioRecorder {
       audio: { sampleRate: 24000, channelCount: 1 },
     });
     this.recorder = new MediaRecorder(stream);
+    console.log(this.recorder.audioBitsPerSecond);
 
     const microphone = this.audioContext.createMediaStreamSource(stream);
 

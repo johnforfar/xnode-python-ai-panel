@@ -184,7 +184,7 @@ export default function SpeakerPage() {
             onClick={
               isRecording
                 ? () => {
-                    audioRecorder?.getRecorder()?.stop();
+                    audioRecorder?.stop();
                     new Promise((resolve) => setTimeout(resolve, 200)).then(
                       () =>
                         ws.current?.send(
@@ -198,7 +198,7 @@ export default function SpeakerPage() {
                     );
                   }
                 : () => {
-                    audioRecorder?.getRecorder()?.start();
+                    audioRecorder?.start();
                   }
             }
           >
