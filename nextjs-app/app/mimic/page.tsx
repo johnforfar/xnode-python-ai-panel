@@ -22,7 +22,11 @@ export default function SpeakerPage() {
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
-  const recorder = useAudioRecorder({ sampleRate: 24000, channelCount: 1 });
+  const recorder = useAudioRecorder({
+    sampleRate: 24000,
+    sampleSize: 2,
+    channelCount: 1,
+  });
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
@@ -33,7 +37,7 @@ export default function SpeakerPage() {
       return;
     }
 
-    recorder.mediaRecorder.ondataavailable = (e) => {
+    recorder.mediaRecorder.addEventListener("dataavailable", (e) => {
       if (e.data.size === 0) return;
 
       e.data.arrayBuffer().then((buffer) =>
@@ -46,16 +50,16 @@ export default function SpeakerPage() {
           )
         )
       );
-    };
+    });
 
-    recorder.mediaRecorder.onstop = (e) => {
+    recorder.mediaRecorder.addEventListener("stop", (e) => {
       // Small delay to make sure any data is processed
       new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
         ws.current?.send(
           btoa(JSON.stringify({ type: "user_audio_end", payload: {} }))
         )
       );
-    };
+    });
   }, [recorder.mediaRecorder, ws.current]);
 
   // WebSocket Connection Effect
@@ -84,11 +88,12 @@ export default function SpeakerPage() {
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(atob(event.data));
+        console.log(message);
 
         // Listen for activity (speaker_activity or audio_update)
         switch (message.type) {
           case "audio":
-            if (message.payload.speaker === parseInt(speakerId) - 1) {
+            if (message.payload.speaker === parseInt(speakerId)) {
               audioPlayer.queueFragment(
                 message.payload.playAt,
                 message.payload.chunk

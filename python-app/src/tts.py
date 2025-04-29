@@ -118,12 +118,13 @@ class TTS:
 
         self.playAt = 0
 
-    async def generate_audio(self, text, speaker_id, broadcast_message):
-        current_time = int(time.time()) 
-        self.playAt = max(current_time + 10, self.playAt) # Set to current time (if lower than playAt)
-        if current_time + 20 < self.playAt:
-            # Generate content max 20 seconds in advance (not to overwhelm the client) 
-            await asyncio.sleep(self.playAt - (current_time + 20))
+    async def generate_audio(self, text, speaker_id, broadcast_message, usePlayAt = True):
+        if usePlayAt:
+            current_time = int(time.time()) 
+            self.playAt = max(current_time + 10, self.playAt) # Set to current time (if lower than playAt)
+            if current_time + 20 < self.playAt:
+                # Generate content max 20 seconds in advance (not to overwhelm the client) 
+                await asyncio.sleep(self.playAt - (current_time + 20))
 
         prompt_segments = self.prompt_segments.copy()
         mimic = speaker_id == 6
@@ -146,7 +147,7 @@ class TTS:
             max_audio_length_ms=30_000,
         ):
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
-            await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt, "chunk": chunk}})
+            await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt if usePlayAt else 0, "chunk": chunk}})
             audio_chunks.append(audio_chunk)
 
         if not mimic:
@@ -159,5 +160,6 @@ class TTS:
                 torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
                 self.generator.sample_rate
             )
-            self.playAt += len(audio_chunks) * 20 * 0.08 + 0.5 # Wait 0.08s per fragment (20 in one batch) + 0.5s between fragments
+            if usePlayAt:
+                self.playAt += len(audio_chunks) * 20 * 0.08 + 0.5 # Wait 0.08s per fragment (20 in one batch) + 0.5s between fragments
             return output

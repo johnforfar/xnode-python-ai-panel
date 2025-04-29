@@ -642,7 +642,7 @@ async def websocket_handler(request):
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                  data = json.loads(base64.b64decode(bytes(msg.data, "ascii")).decode("utf-8"))
-                 logger.info(f"WS_HANDLER [{remote_addr}]: Received TEXT message: {data}")
+                 logger.info(f"WS_HANDLER [{remote_addr}]: Received TEXT message: {data["type"]}")
                  # Optional: Handle commands sent FROM frontend via WS if needed later
                  if data["type"] == "user_audio":
                      if not panel_manager.mimic_wav:
@@ -656,7 +656,9 @@ async def websocket_handler(request):
                     panel_manager.mimic_wav.close()
                     panel_manager.mimic_wav = None
 
-                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message)
+                    logger.info("Start generating mimic")
+                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message, False)
+                    logger.info("Finish streaming mimic")
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
                  # Handle binary data if needed later
