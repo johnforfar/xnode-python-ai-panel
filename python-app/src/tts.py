@@ -76,9 +76,13 @@ class TTS:
         self.generated_segments = []
         self.prompt_segments = [
             prepare_prompt(
-                SPEAKER_PROMPTS["conversational_a"]["text"],
+                ("And here are the ingredients. Although olives don't go in it, the olives are for you to eat as you're making it. It's very simple. "
+                "You'll need vodka, elderflower cordial, mint soda, some limes. And if you don't like vodka, you don't have to put it in. "
+                "So we're gonna get cracking. You also need to have some form of a drink as you're getting the food ready for yourself. "
+                "Anyway, and this is my personal favorite. That's not very helpful if you have a different glass, "
+                "but give it a go and then I'm going to do you pick your leaves and then you're going to clap them."),
                 0,
-                SPEAKER_PROMPTS["conversational_a"]["audio"],
+                f"{data_dir()}/voices/florence.wav",
                 self.generator.sample_rate
             ),
             prepare_prompt(
