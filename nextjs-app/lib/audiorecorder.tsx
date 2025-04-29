@@ -17,12 +17,7 @@ export class AudioRecorder {
     processorNode.connect(this.audioContext.destination);
 
     processorNode.onaudioprocess = (e) => {
-      const data = e.inputBuffer.getChannelData(0);
-      const audioSlice = Array.from(data);
-      console.log(
-        `Sending audio chunk: length=${audioSlice.length}, sample_rate=${this.audioContext.sampleRate}`
-      );
-      onAudio(data);
+      onAudio(e.inputBuffer.getChannelData(0));
     };
   }
 

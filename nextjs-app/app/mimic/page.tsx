@@ -39,15 +39,14 @@ export default function SpeakerPage() {
     const recorder = new AudioRecorder();
     recorder.init({
       onAudio: (audio) => {
-        audioPlayer.queueFragment(0, Array.from(audio));
-        // ws.current?.send(
-        //   btoa(
-        //     JSON.stringify({
-        //       type: "user_audio",
-        //       payload: Array.from(audio),
-        //     })
-        //   )
-        // );
+        ws.current?.send(
+          btoa(
+            JSON.stringify({
+              type: "user_audio",
+              payload: Array.from(audio),
+            })
+          )
+        );
       },
     });
     setAudioRecorder(recorder);
@@ -192,7 +191,7 @@ export default function SpeakerPage() {
                     setRecording(false);
                   }
                 : () => {
-                    audioRecorder?.getRecorder()?.start(1000);
+                    audioRecorder?.getRecorder()?.start();
                     setRecording(true);
                   }
             }
