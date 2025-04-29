@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { LiveAudioVisualizer } from "react-audio-visualize";
-import { useAudioRecorder } from "react-audio-voice-recorder";
 import { AudioPlayer } from "@/lib/audioplayer";
 import { Mic, Square } from "lucide-react";
+import { AudioRecorder } from "@/lib/audiorecorder";
 
 // --- WebSocket Connection Status Type ---
 type WsConnectionStatus =
@@ -22,45 +22,35 @@ export default function SpeakerPage() {
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
-  const recorder = useAudioRecorder({
-    sampleRate: 24000,
-    sampleSize: 16,
-    channelCount: 1,
-  });
+  const [recording, setRecording] = useState<boolean>(false);
+  const [audioRecorder, setAudioRecorder] = useState<AudioRecorder | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
   }, []);
 
   useEffect(() => {
-    if (!recorder.mediaRecorder || !ws.current) {
+    if (!ws.current) {
       return;
     }
 
-    recorder.mediaRecorder.addEventListener("dataavailable", (e) => {
-      if (e.data.size === 0) return;
-
-      e.data.arrayBuffer().then((buffer) =>
+    const recorder = new AudioRecorder();
+    recorder.init({
+      onAudio: (audio) => {
         ws.current?.send(
           btoa(
             JSON.stringify({
               type: "user_audio",
-              payload: Array.from(new Float32Array(buffer)),
+              payload: Array.from(audio),
             })
           )
-        )
-      );
+        );
+      },
     });
-
-    recorder.mediaRecorder.addEventListener("stop", (e) => {
-      // Small delay to make sure any data is processed
-      new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
-        ws.current?.send(
-          btoa(JSON.stringify({ type: "user_audio_end", payload: {} }))
-        )
-      );
-    });
-  }, [recorder.mediaRecorder, ws.current]);
+    setAudioRecorder(recorder);
+  }, [ws.current]);
 
   // WebSocket Connection Effect
   useEffect(() => {
@@ -183,13 +173,30 @@ export default function SpeakerPage() {
         </div>
         <div className="flex place-content-center">
           <button
-            onClick={() =>
-              recorder.isRecording
-                ? recorder.stopRecording()
-                : recorder.startRecording()
+            onClick={
+              recording
+                ? () => {
+                    audioRecorder?.getRecorder()?.stop();
+                    new Promise((resolve) => setTimeout(resolve, 200)).then(
+                      () =>
+                        ws.current?.send(
+                          btoa(
+                            JSON.stringify({
+                              type: "user_audio_end",
+                              payload: {},
+                            })
+                          )
+                        )
+                    );
+                    setRecording(false);
+                  }
+                : () => {
+                    audioRecorder?.getRecorder()?.start(100);
+                    setRecording(true);
+                  }
             }
           >
-            {recorder.isRecording ? (
+            {recording ? (
               <Square className="size-20" />
             ) : (
               <Mic className="size-20" />
@@ -202,9 +209,9 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
-          {recorder.mediaRecorder && (
+          {audioRecorder && audioRecorder.getRecorder() && recording && (
             <LiveAudioVisualizer
-              mediaRecorder={recorder.mediaRecorder}
+              mediaRecorder={audioRecorder.getRecorder() as MediaRecorder}
               width={500} // Adjust width as needed
               height={75} // Adjust height as needed
               barWidth={3}

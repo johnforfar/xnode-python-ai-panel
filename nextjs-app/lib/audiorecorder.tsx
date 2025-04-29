@@ -1,0 +1,31 @@
+"use client";
+
+export class AudioRecorder {
+  private audioContext = new AudioContext();
+  private recorder: MediaRecorder | undefined;
+
+  public async init({ onAudio }: { onAudio: (audio: Float32Array) => void }) {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        sampleRate: 24000,
+        sampleSize: 16,
+        channelCount: 1,
+      },
+    });
+    this.recorder = new MediaRecorder(stream);
+
+    const microphone = this.audioContext.createMediaStreamSource(stream);
+
+    const processorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+    microphone.connect(processorNode);
+    processorNode.connect(this.audioContext.destination);
+
+    processorNode.onaudioprocess = (e) => {
+      onAudio(e.inputBuffer.getChannelData(0));
+    };
+  }
+
+  public getRecorder() {
+    return this.recorder;
+  }
+}
