@@ -22,7 +22,6 @@ export default function SpeakerPage() {
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
-  const [recording, setRecording] = useState<boolean>(false);
   const [audioRecorder, setAudioRecorder] = useState<AudioRecorder | undefined>(
     undefined
   );
@@ -135,6 +134,15 @@ export default function SpeakerPage() {
     setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 10);
   }, [audioPlayer]);
 
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  useEffect(() => {
+    if (!audioRecorder) {
+      return;
+    }
+
+    setInterval(() => setIsRecording(audioRecorder.isRecording()), 10);
+  }, [audioRecorder]);
+
   return (
     // Use a relative container for absolute positioning of overlays
     <main className="relative min-h-screen w-full font-sans overflow-hidden text-white">
@@ -174,7 +182,7 @@ export default function SpeakerPage() {
         <div className="flex place-content-center">
           <button
             onClick={
-              recording
+              isRecording
                 ? () => {
                     audioRecorder?.getRecorder()?.stop();
                     new Promise((resolve) => setTimeout(resolve, 200)).then(
@@ -188,15 +196,13 @@ export default function SpeakerPage() {
                           )
                         )
                     );
-                    setRecording(false);
                   }
                 : () => {
                     audioRecorder?.getRecorder()?.start();
-                    setRecording(true);
                   }
             }
           >
-            {recording ? (
+            {isRecording ? (
               <Square className="size-20" />
             ) : (
               <Mic className="size-20" />
@@ -209,7 +215,7 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
-          {audioRecorder && audioRecorder.getRecorder() && recording && (
+          {audioRecorder && audioRecorder.getRecorder() && isRecording && (
             <LiveAudioVisualizer
               mediaRecorder={audioRecorder.getRecorder() as MediaRecorder}
               width={500} // Adjust width as needed

@@ -2,6 +2,7 @@
 
 export class AudioRecorder {
   private audioContext = new AudioContext({ sampleRate: 24000 });
+  private recording = false;
   private recorder: MediaRecorder | undefined;
 
   public async init({ onAudio }: { onAudio: (audio: Float32Array) => void }) {
@@ -17,11 +18,27 @@ export class AudioRecorder {
     processorNode.connect(this.audioContext.destination);
 
     processorNode.onaudioprocess = (e) => {
+      if (!this.recorder) {
+        return;
+      }
+
       onAudio(e.inputBuffer.getChannelData(0));
     };
   }
 
   public getRecorder() {
     return this.recorder;
+  }
+
+  public isRecording() {
+    return this.recording;
+  }
+
+  public start() {
+    this.recording = true;
+  }
+
+  public stop() {
+    this.recording = false;
   }
 }
