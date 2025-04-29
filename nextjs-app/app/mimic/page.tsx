@@ -146,7 +146,11 @@ export default function SpeakerPage() {
       return;
     }
 
-    setInterval(() => setIsRecording(audioRecorder.isRecording()), 10);
+    const interval = setInterval(
+      () => setIsRecording(audioRecorder.isRecording()),
+      10
+    );
+    return () => clearInterval(interval);
   }, [audioRecorder]);
 
   return (
@@ -160,7 +164,9 @@ export default function SpeakerPage() {
         <span>
           WS: {wsStatus} | ID: {speakerId} | Speaking:{" "}
           {isPlaying ? "Yes" : "No"} |{" "}
-          <button onClick={() => setEcho(!echo)}>Toggle Echo</button>
+          <button onClick={() => setEcho(!echo)}>
+            Echo: {echo ? "On" : "Off"}
+          </button>
         </span>
       </div>
 
