@@ -39,7 +39,7 @@ export default function SpeakerPage() {
   );
 
   useEffect(() => {
-    setAudioPlayer(new AudioPlayer());
+    setAudioPlayer(new AudioPlayer({ muted: true }));
   }, []);
 
   // Set speaker info based on ID

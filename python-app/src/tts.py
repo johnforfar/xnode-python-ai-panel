@@ -68,9 +68,9 @@ class TTS:
                 self.generator.sample_rate
             ),
             prepare_prompt(
-                ("Despite my morbid nature as a child, there's nothing that can prepare you for seeing someone butterflied open. "
-                "I've done a whole plethora of criminal cases. I've done everything from women who have been dismembered, torn apart, stabbed. "
-                "I've dealt with cases of fathers taking their gun on their children."),
+                ("They almost seem alive. We did have to cut off a large portion of their carpet in order to transport him out of the building. "
+                "There was just no way we could physically get him to move without ripping off all what's left of his skin to the carpet, "
+                "which is leaving behind potential evidence."),
                 3,
                 f"{data_dir()}/voices/satoshi.wav",
                 self.generator.sample_rate
@@ -111,7 +111,7 @@ class TTS:
 
         audio_chunks = []
         for audio_chunk in self.generator.generate_stream(
-            text=re.sub(r'\.\.\.| - |; ', ', ', re.sub(r'[:"*]', '', text)), # Remove/replace some characters as they mess up the speech
+            text=re.sub(r'\.\.\.| - |; |: |---', ', ', re.sub(r'["*]', '', text)), # Remove/replace some characters as they mess up the speech
             speaker=speaker_id,
             # Only add this speakers prompt and last message to context
             context=next(([item] for item in prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
