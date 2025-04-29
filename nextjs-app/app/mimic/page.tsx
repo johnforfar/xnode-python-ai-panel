@@ -197,9 +197,9 @@ export default function SpeakerPage() {
           <span>
             Hello there, I am mimic. I will copy your voice and give myself
             several compliments. I am not quite sure what text we should put
-            here, anything less than 30 seconds should work. Make sure the
-            content has a similar vibe all the way through that matches our
-            output prompt.
+            here, anything less than 30 seconds should work. Are you excited for
+            the result? Make sure the content has a similar vibe all the way
+            through that matches our output prompt.
           </span>
         </div>
         <div className="flex place-content-center">
