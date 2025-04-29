@@ -79,10 +79,10 @@ export class AudioPlayer {
         setTimeout(resolve, delay);
       });
     } else {
-      this.state = "playing";
       console.log(`Playing fragment ${delay}ms late`);
     }
 
+    this.state = "playing";
     await new Promise(async (resolve, reject) => {
       try {
         // Automatically resume audio context if suspended
