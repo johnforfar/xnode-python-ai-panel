@@ -32,25 +32,26 @@ export default function SpeakerPage() {
   }, []);
 
   useEffect(() => {
-    if (!ws.current) {
+    if (!ws.current || !audioPlayer) {
       return;
     }
 
     const recorder = new AudioRecorder();
     recorder.init({
       onAudio: (audio) => {
-        ws.current?.send(
-          btoa(
-            JSON.stringify({
-              type: "user_audio",
-              payload: Array.from(audio),
-            })
-          )
-        );
+        audioPlayer.queueFragment(0, Array.from(audio));
+        // ws.current?.send(
+        //   btoa(
+        //     JSON.stringify({
+        //       type: "user_audio",
+        //       payload: Array.from(audio),
+        //     })
+        //   )
+        // );
       },
     });
     setAudioRecorder(recorder);
-  }, [ws.current]);
+  }, [ws.current, audioPlayer]);
 
   // WebSocket Connection Effect
   useEffect(() => {
@@ -191,7 +192,7 @@ export default function SpeakerPage() {
                     setRecording(false);
                   }
                 : () => {
-                    audioRecorder?.getRecorder()?.start(100);
+                    audioRecorder?.getRecorder()?.start(1000);
                     setRecording(true);
                   }
             }
