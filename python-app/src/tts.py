@@ -1,7 +1,6 @@
 import os
 import torch
 import torchaudio
-from huggingface_hub import hf_hub_download
 from env import data_dir
 import re
 from generator import Segment, load_csm_1b
@@ -11,41 +10,6 @@ import time
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
-
-# Default prompts are available at https://hf.co/sesame/csm-1b
-prompt_filepath_conversational_a = hf_hub_download(
-    repo_id="sesame/csm-1b",
-    filename="prompts/conversational_a.wav"
-)
-prompt_filepath_conversational_b = hf_hub_download(
-    repo_id="sesame/csm-1b",
-    filename="prompts/conversational_b.wav"
-)
-
-SPEAKER_PROMPTS = {
-        "conversational_a": {
-        "text": (
-            "like revising for an exam I'd have to try and like keep up the momentum because I'd "
-            "start really early I'd be like okay I'm gonna start revising now and then like "
-            "you're revising for ages and then I just like start losing steam I didn't do that "
-            "for the exam we had recently to be fair that was a more of a last minute scenario "
-            "but like yeah I'm trying to like yeah I noticed this yesterday that like Mondays I "
-            "sort of start the day with this not like a panic but like a"
-        ),
-        "audio": prompt_filepath_conversational_a
-    },
-    "conversational_b": {
-        "text": (
-            "like a super Mario level. Like it's very like high detail. And like, once you get "
-            "into the park, it just like, everything looks like a computer game and they have all "
-            "these, like, you know, if, if there's like a, you know, like in a Mario game, they "
-            "will have like a question block. And if you like, you know, punch it, a coin will "
-            "come out. So like everyone, when they come into the park, they get like this little "
-            "bracelet and then you can go punching question blocks around."
-        ),
-        "audio": prompt_filepath_conversational_b
-    }
-}
 
 def load_prompt_audio(audio_path: str, target_sample_rate: int) -> torch.Tensor:
     audio_tensor, sample_rate = torchaudio.load(audio_path)
@@ -104,9 +68,11 @@ class TTS:
                 self.generator.sample_rate
             ),
             prepare_prompt(
-                SPEAKER_PROMPTS["conversational_b"]["text"],
+                ("Despite my morbid nature as a child, there's nothing that can prepare you for seeing someone butterflied open. "
+                "I've done a whole plethora of criminal cases. I've done everything from women who have been dismembered, torn apart, stabbed. "
+                "I've dealt with cases of fathers taking their gun on their children."),
                 3,
-                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                f"{data_dir()}/voices/satoshi.wav",
                 self.generator.sample_rate
             ),
             prepare_prompt(
