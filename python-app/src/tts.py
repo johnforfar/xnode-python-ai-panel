@@ -113,8 +113,8 @@ class TTS:
         for audio_chunk in self.generator.generate_stream(
             text=re.sub(r'\.\.\.| - |; |: |---', ', ', re.sub(r'["*]', '', text)), # Remove/replace some characters as they mess up the speech
             speaker=speaker_id,
-            # Only add this speakers prompt and last message to context
-            context=next(([item] for item in prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
+            # Only add this speakers prompt to context
+            context=next(([item] for item in prompt_segments if item.speaker == speaker_id), []),
             max_audio_length_ms=30_000,
         ):
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
