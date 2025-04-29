@@ -14,12 +14,27 @@ from datetime import datetime
 os.environ["NO_TORCH_COMPILE"] = "1"
 
 # Default prompts are available at https://hf.co/sesame/csm-1b
+prompt_filepath_conversational_a = hf_hub_download(
+    repo_id="sesame/csm-1b",
+    filename="prompts/conversational_a.wav"
+)
 prompt_filepath_conversational_b = hf_hub_download(
     repo_id="sesame/csm-1b",
     filename="prompts/conversational_b.wav"
 )
 
 SPEAKER_PROMPTS = {
+        "conversational_a": {
+        "text": (
+            "like revising for an exam I'd have to try and like keep up the momentum because I'd "
+            "start really early I'd be like okay I'm gonna start revising now and then like "
+            "you're revising for ages and then I just like start losing steam I didn't do that "
+            "for the exam we had recently to be fair that was a more of a last minute scenario "
+            "but like yeah I'm trying to like yeah I noticed this yesterday that like Mondays I "
+            "sort of start the day with this not like a panic but like a"
+        ),
+        "audio": prompt_filepath_conversational_a
+    },
     "conversational_b": {
         "text": (
             "like a super Mario level. Like it's very like high detail. And like, once you get "
@@ -62,9 +77,9 @@ class TTS:
         self.generated_segments = []
         self.prompt_segments = [
             prepare_prompt(
-                SPEAKER_PROMPTS["conversational_b"]["text"],
+                SPEAKER_PROMPTS["conversational_a"]["text"],
                 0,
-                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                SPEAKER_PROMPTS["conversational_a"]["audio"],
                 self.generator.sample_rate
             ),
             prepare_prompt(
