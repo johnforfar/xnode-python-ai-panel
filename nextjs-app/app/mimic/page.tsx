@@ -24,7 +24,7 @@ export default function SpeakerPage() {
   );
   const recorder = useAudioRecorder({
     sampleRate: 24000,
-    sampleSize: 2,
+    sampleSize: 16,
     channelCount: 1,
   });
 
@@ -45,7 +45,7 @@ export default function SpeakerPage() {
           btoa(
             JSON.stringify({
               type: "user_audio",
-              payload: [...new Uint8Array(buffer)],
+              payload: Array.from(new Float32Array(buffer)),
             })
           )
         )
