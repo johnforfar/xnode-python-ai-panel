@@ -32,10 +32,6 @@ export default function SpeakerPage() {
   }, []);
 
   useEffect(() => {
-    if (!ws.current) {
-      return;
-    }
-
     const recorder = new AudioRecorder();
     recorder
       .init({

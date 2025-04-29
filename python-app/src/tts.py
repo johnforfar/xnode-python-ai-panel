@@ -135,7 +135,7 @@ class TTS:
                 "Make sure the content has a similar vibe all the way through that matches our output prompt."),
                 6,
                 f"{data_dir()}/voices/mimic.wav",
-                self.generator.sample_rate
+                24000
             ))
 
         audio_chunks = []
@@ -143,7 +143,7 @@ class TTS:
             text=re.sub(r'[:;"*]| -', '', text), # Remove : ; " * -(with a space in front) characters as they mess up the speech
             speaker=speaker_id,
             # Only add this speakers prompt and last message to context
-            context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
+            context=next(([item] for item in prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []),
             max_audio_length_ms=30_000,
         ):
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
