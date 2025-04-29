@@ -36,10 +36,18 @@ export default function SpeakerPage() {
     recorder.mediaRecorder.ondataavailable = (e) => {
       if (e.data.size === 0) return;
 
-      console.log(e.data);
-      ws.current?.send(
-        btoa(JSON.stringify({ type: "user_audio", payload: e.data }))
-      );
+      e.data
+        .arrayBuffer()
+        .then((buffer) =>
+          ws.current?.send(
+            btoa(
+              JSON.stringify({
+                type: "user_audio",
+                payload: new Uint8Array(buffer),
+              })
+            )
+          )
+        );
     };
 
     recorder.mediaRecorder.onstop = (e) => {
