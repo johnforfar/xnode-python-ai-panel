@@ -74,17 +74,7 @@ class TTS:
         self.generator = load_csm_1b(device)
 
         # Generate each utterance
-        self.generated_segments = [
-            prepare_prompt(
-                ("Then he said, about six months ago, he's better than Reckon, "
-                "and then he said a few nights ago, he's the greatest we've ever had. "
-                "I said, I said, does that include Lincoln and George Washington? "
-                "He said, that includes them all. That's ludops."),
-                4,
-                f"{data_dir()}/voices/donald.wav",
-                self.generator.sample_rate
-            ),
-        ]
+        self.generated_segments = []
         self.prompt_segments = [
             prepare_prompt(
                 SPEAKER_PROMPTS["conversational_a"]["text"],
@@ -111,9 +101,12 @@ class TTS:
                 self.generator.sample_rate
             ),
             prepare_prompt(
-                SPEAKER_PROMPTS["conversational_b"]["text"],
+                ("Then he said, about six months ago, he's better than Reckon, "
+                "and then he said a few nights ago, he's the greatest we've ever had. "
+                "I said, I said, does that include Lincoln and George Washington? "
+                "He said, that includes them all. That's ludops."),
                 4,
-                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                f"{data_dir()}/voices/donald.wav",
                 self.generator.sample_rate
             ),
         ]
