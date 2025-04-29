@@ -1,7 +1,7 @@
 "use client";
 
 export class AudioRecorder {
-  private audioContext = new AudioContext();
+  private audioContext = new AudioContext({ sampleRate: 24000 });
   private recorder: MediaRecorder | undefined;
 
   public async init({ onAudio }: { onAudio: (audio: Float32Array) => void }) {
