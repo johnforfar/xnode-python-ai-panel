@@ -651,11 +651,11 @@ async def websocket_handler(request):
                         panel_manager.mimic_wav.setframerate(24000) 
 
                      panel_manager.mimic_wav.writeframes(data["payload"])
-                     if data["type"] == "user_audio_end":
-                         panel_manager.mimic_wav.close()
-                         panel_manager.mimic_wav = None
+                 if data["type"] == "user_audio_end":
+                    panel_manager.mimic_wav.close()
+                    panel_manager.mimic_wav = None
 
-                         await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message)
+                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message)
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
                  # Handle binary data if needed later
