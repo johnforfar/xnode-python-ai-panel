@@ -37,38 +37,39 @@ export default function SpeakerPage() {
     }
 
     const recorder = new AudioRecorder();
-    recorder.init({
-      onAudio: (audio) => {
-        if (echo) {
-          audioPlayer?.queueFragment(0, Array.from(audio));
-          return;
-        }
+    recorder
+      .init({
+        onAudio: (audio) => {
+          if (echo) {
+            audioPlayer?.queueFragment(0, Array.from(audio));
+            return;
+          }
 
-        ws.current?.send(
-          btoa(
-            JSON.stringify({
-              type: "user_audio",
-              payload: Array.from(audio),
-            })
-          )
-        );
-      },
-      onStop: () => {
-        if (!echo) {
-          new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
-            ws.current?.send(
-              btoa(
-                JSON.stringify({
-                  type: "user_audio_end",
-                  payload: {},
-                })
-              )
+          ws.current?.send(
+            btoa(
+              JSON.stringify({
+                type: "user_audio",
+                payload: Array.from(audio),
+              })
             )
           );
-        }
-      },
-    });
-    setAudioRecorder(recorder);
+        },
+        onStop: () => {
+          if (!echo) {
+            new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
+              ws.current?.send(
+                btoa(
+                  JSON.stringify({
+                    type: "user_audio_end",
+                    payload: {},
+                  })
+                )
+              )
+            );
+          }
+        },
+      })
+      .then(() => setAudioRecorder(recorder));
   }, [ws.current, audioPlayer, echo]);
 
   // WebSocket Connection Effect
@@ -97,7 +98,6 @@ export default function SpeakerPage() {
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(atob(event.data));
-        console.log(message);
 
         // Listen for activity (speaker_activity or audio_update)
         switch (message.type) {

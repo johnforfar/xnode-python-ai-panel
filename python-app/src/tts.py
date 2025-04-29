@@ -133,7 +133,7 @@ class TTS:
                 ("Hello there, I am mimic. I will copy your voice and give myself several compliments. "
                 "I am not quite sure what text we should put here, anything less than 30 seconds should work. "
                 "Make sure the content has a similar vibe all the way through that matches our output prompt."),
-                4,
+                6,
                 f"{data_dir()}/voices/mimic.wav",
                 self.generator.sample_rate
             ))
