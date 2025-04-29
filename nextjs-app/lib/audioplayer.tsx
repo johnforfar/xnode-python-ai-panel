@@ -18,12 +18,10 @@ export class AudioPlayer {
 
   public queueFragment(playAt: number, fragment: number[]) {
     console.log(
-      `Received fragment to play at ${new Date(
-        playAt * 1000
-      ).toTimeString()} (${playAt * 1000 - Date.now()}ms from now)`
+      `Received fragment to play ${playAt * 1000 - Date.now()}ms from now`
     );
-    const nextUp = this.queue.at(2);
-    if (nextUp) {
+    const nextUp = this.queue.at(-1);
+    if (nextUp && nextUp.playAt === playAt) {
       // Combine fragments to reduce overhead
       nextUp.data = nextUp.data.concat(fragment);
     } else {
