@@ -657,7 +657,7 @@ async def websocket_handler(request):
                     panel_manager.mimic_wav = None
 
                     logger.info("Start generating mimic")
-                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Pretty cool stuff huh? I think Samuel deserves a raise.", 6, panel_manager.broadcast_message, False)
+                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message, False)
                     logger.info("Finish streaming mimic")
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
