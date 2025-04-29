@@ -5,7 +5,9 @@ export class AudioRecorder {
   private recorder: MediaRecorder | undefined;
 
   public async init({ onAudio }: { onAudio: (audio: Float32Array) => void }) {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 24000, channelCount: 1 },
+    });
     this.recorder = new MediaRecorder(stream);
 
     const microphone = this.audioContext.createMediaStreamSource(stream);
