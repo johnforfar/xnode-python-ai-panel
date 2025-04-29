@@ -10,7 +10,6 @@ import base64
 from tts import TTS
 from uagents import Agent, Bureau, Context, Model as UagentsModel
 import wave
-import numpy as np
 
 # --- Logging Setup (Keep as is) ---
 console_handler = logging.StreamHandler()
@@ -651,14 +650,15 @@ async def websocket_handler(request):
                         panel_manager.mimic_wav.setsampwidth(2)  # 16-bit
                         panel_manager.mimic_wav.setframerate(24000) 
 
-                     panel_manager.mimic_wav.writeframes((np.array(data["payload"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
+                     panel_manager.mimic_wav.writeframes(bytes(data["payload"]))
                  if data["type"] == "user_audio_end":
-                    panel_manager.mimic_wav.close()
-                    panel_manager.mimic_wav = None
+                    if panel_manager.mimic_wav:
+                        panel_manager.mimic_wav.close()
+                        panel_manager.mimic_wav = None
 
-                    logger.info("Start generating mimic")
-                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message, False)
-                    logger.info("Finish streaming mimic")
+                        logger.info("Start generating mimic")
+                        await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message, False)
+                        logger.info("Finish streaming mimic")
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
                  # Handle binary data if needed later

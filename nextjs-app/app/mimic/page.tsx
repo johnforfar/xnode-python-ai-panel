@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { LiveAudioVisualizer } from "react-audio-visualize";
-import { useAudioRecorder } from "react-audio-voice-recorder";
 import { AudioPlayer } from "@/lib/audioplayer";
 import { Mic, Square } from "lucide-react";
+import { MediaRecorder, register } from "extendable-media-recorder";
+import { connect } from "extendable-media-recorder-wav-encoder";
 
 // --- WebSocket Connection Status Type ---
 type WsConnectionStatus =
@@ -22,22 +23,42 @@ export default function SpeakerPage() {
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
-  const recorder = useAudioRecorder({
-    sampleRate: 24000,
-    sampleSize: 16,
-    channelCount: 1,
-  });
+  const [recorder, setRecorder] = useState<MediaRecorder | undefined>(
+    undefined
+  );
+  const [recording, setRecording] = useState<boolean>(false);
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
   }, []);
 
   useEffect(() => {
-    if (!recorder.mediaRecorder || !ws.current) {
+    connect()
+      .then(register)
+      .then(() =>
+        navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 24000,
+            sampleSize: 16,
+            channelCount: 1,
+          },
+        })
+      )
+      .then((stream) => {
+        setRecorder(
+          new MediaRecorder(stream, {
+            mimeType: "audio/wav",
+          }) as MediaRecorder
+        );
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!recorder || !ws.current) {
       return;
     }
 
-    recorder.mediaRecorder.addEventListener("dataavailable", (e) => {
+    recorder.addEventListener("dataavailable", (e) => {
       if (e.data.size === 0) return;
 
       e.data.arrayBuffer().then((buffer) =>
@@ -45,14 +66,14 @@ export default function SpeakerPage() {
           btoa(
             JSON.stringify({
               type: "user_audio",
-              payload: Array.from(new Float32Array(buffer)),
+              payload: Array.from(new Uint8Array(buffer)),
             })
           )
         )
       );
     });
 
-    recorder.mediaRecorder.addEventListener("stop", (e) => {
+    recorder.addEventListener("stop", (e) => {
       // Small delay to make sure any data is processed
       new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
         ws.current?.send(
@@ -60,7 +81,7 @@ export default function SpeakerPage() {
         )
       );
     });
-  }, [recorder.mediaRecorder, ws.current]);
+  }, [recorder, ws.current]);
 
   // WebSocket Connection Effect
   useEffect(() => {
@@ -184,12 +205,18 @@ export default function SpeakerPage() {
         <div className="flex place-content-center">
           <button
             onClick={() =>
-              recorder.isRecording
-                ? recorder.stopRecording()
-                : recorder.startRecording()
+              recording
+                ? () => {
+                    recorder?.start(100);
+                    setRecording(true);
+                  }
+                : () => {
+                    recorder?.stop();
+                    setRecording(false);
+                  }
             }
           >
-            {recorder.isRecording ? (
+            {recording ? (
               <Square className="size-20" />
             ) : (
               <Mic className="size-20" />
@@ -202,9 +229,9 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
-          {recorder.mediaRecorder && (
+          {recorder && (
             <LiveAudioVisualizer
-              mediaRecorder={recorder.mediaRecorder}
+              mediaRecorder={recorder}
               width={500} // Adjust width as needed
               height={75} // Adjust height as needed
               barWidth={3}
