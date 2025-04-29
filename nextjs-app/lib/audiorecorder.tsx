@@ -5,13 +5,7 @@ export class AudioRecorder {
   private recorder: MediaRecorder | undefined;
 
   public async init({ onAudio }: { onAudio: (audio: Float32Array) => void }) {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        sampleRate: 24000,
-        sampleSize: 16,
-        channelCount: 1,
-      },
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.recorder = new MediaRecorder(stream);
 
     const microphone = this.audioContext.createMediaStreamSource(stream);
@@ -21,7 +15,12 @@ export class AudioRecorder {
     processorNode.connect(this.audioContext.destination);
 
     processorNode.onaudioprocess = (e) => {
-      onAudio(e.inputBuffer.getChannelData(0));
+      const data = e.inputBuffer.getChannelData(0);
+      const audioSlice = Array.from(data);
+      console.log(
+        `Sending audio chunk: length=${audioSlice.length}, sample_rate=${this.audioContext.sampleRate}`
+      );
+      onAudio(data);
     };
   }
 
