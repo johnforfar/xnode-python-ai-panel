@@ -202,10 +202,10 @@ export default function SpeakerPage() {
         <div className="grow text-5xl flex place-items-center place-content-center">
           <span>
             Hello there, I am mimic. I will copy your voice and give myself
-            several compliments. Are you excited for the result? I am not quite
-            sure what text we should put here, anything less than 30 seconds
-            should work. Make sure the content has a similar vibe all the way
-            through that matches our output prompt.
+            several compliments. I bet you can't wait to see how the result
+            turns out. I am not quite sure what text we should put here,
+            anything less than 30 seconds should work. Make sure the content has
+            a similar vibe all the way through that matches our output prompt.
           </span>
         </div>
         <div className="flex place-content-center">

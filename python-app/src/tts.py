@@ -130,7 +130,8 @@ class TTS:
         mimic = speaker_id == 6
         if mimic:
             prompt_segments.append(prepare_prompt(
-                ("Hello there, I am mimic. I will copy your voice and give myself several compliments. Are you excited for the result?"
+                ("Hello there, I am mimic. I will copy your voice and give myself several compliments. "
+                "I bet you can't wait to see how the result turns out."
                 "I am not quite sure what text we should put here, anything less than 30 seconds should work. "
                 "Make sure the content has a similar vibe all the way through that matches our output prompt."),
                 6,
