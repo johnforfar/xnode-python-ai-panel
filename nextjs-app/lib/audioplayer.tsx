@@ -6,13 +6,15 @@ export interface QueuedAudio {
 }
 
 export class AudioPlayer {
+  private muted: boolean;
   private queue: QueuedAudio[] = [];
   private audioContext = new AudioContext();
   private state: "idle" | "queued" | "playing" = "idle";
   private output = this.audioContext.createMediaStreamDestination();
   private recorder = new MediaRecorder(this.output.stream);
 
-  constructor() {
+  constructor(params?: { muted?: boolean }) {
+    this.muted = params?.muted === undefined ? false : params.muted;
     this.recorder.start();
   }
 
@@ -43,6 +45,7 @@ export class AudioPlayer {
 
   public debug() {
     return {
+      muted: this.muted,
       queue: this.queue,
       audioContext: this.audioContext,
       state: this.state,
@@ -114,7 +117,9 @@ export class AudioPlayer {
 
         // Connect to destination and play
         source.connect(this.output);
-        source.connect(this.audioContext.destination);
+        if (!this.muted) {
+          source.connect(this.audioContext.destination);
+        }
         console.log(
           "Start Fragment",
           Date.now(),
