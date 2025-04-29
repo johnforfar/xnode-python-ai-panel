@@ -113,9 +113,9 @@ class TTS:
     async def generate_audio(self, text, speaker_id, broadcast_message):
         current_time = int(time.time()) 
         self.playAt = max(current_time + 10, self.playAt) # Set to current time (if lower than playAt)
-        if current_time > self.playAt + 10:
-            # Generate content max 10 seconds in advance (not to overwhelm the client) 
-            await asyncio.sleep(self.playAt + 10 - current_time)
+        if current_time + 20 < self.playAt:
+            # Generate content max 20 seconds in advance (not to overwhelm the client) 
+            await asyncio.sleep(self.playAt - (current_time + 20))
 
         audio_chunks = []
         for audio_chunk in self.generator.generate_stream(
