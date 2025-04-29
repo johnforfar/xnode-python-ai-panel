@@ -32,7 +32,8 @@ export default function SpeakerPage() {
   }, []);
 
   useEffect(() => {
-    setAudioRecorder(new AudioRecorder());
+    const recorder = new AudioRecorder();
+    recorder.init({}).then(() => setAudioRecorder(recorder));
   }, []);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function SpeakerPage() {
       return;
     }
 
-    audioRecorder.init({
+    audioRecorder.update({
       onAudio: (audio) => {
         if (echo) {
           audioPlayer?.queueFragment(0, Array.from(audio));
@@ -232,7 +233,7 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
-          {audioRecorder && audioRecorder.getRecorder() && isRecording && (
+          {audioRecorder && isRecording && (
             <LiveAudioVisualizer
               mediaRecorder={audioRecorder.getRecorder() as MediaRecorder}
               width={500} // Adjust width as needed

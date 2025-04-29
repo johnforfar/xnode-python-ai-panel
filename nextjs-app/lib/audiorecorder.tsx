@@ -4,6 +4,7 @@ export class AudioRecorder {
   private audioContext = new AudioContext({ sampleRate: 24000 });
   private recording = false;
   private recorder: MediaRecorder | undefined;
+  private onAudio: ((audio: Float32Array) => void) | undefined;
   private onStop: (() => void) | undefined;
 
   public async init({
@@ -20,6 +21,7 @@ export class AudioRecorder {
     if (this.recorder.state === "recording") {
       this.recorder.stop();
     }
+    this.onAudio = onAudio;
     this.onStop = onStop;
 
     const microphone = this.audioContext.createMediaStreamSource(stream);
@@ -33,7 +35,7 @@ export class AudioRecorder {
         return;
       }
 
-      onAudio?.(e.inputBuffer.getChannelData(0));
+      this.onAudio?.(e.inputBuffer.getChannelData(0));
     };
   }
 
@@ -54,5 +56,16 @@ export class AudioRecorder {
     this.recording = false;
     this.recorder?.stop();
     this.onStop?.();
+  }
+
+  public update({
+    onAudio,
+    onStop,
+  }: {
+    onAudio?: (audio: Float32Array) => void;
+    onStop?: () => void;
+  }) {
+    this.onAudio = onAudio;
+    this.onStop = onStop;
   }
 }
