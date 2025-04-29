@@ -88,10 +88,13 @@ class TTS:
                 SPEAKER_PROMPTS["conversational_b"]["audio"],
                 self.generator.sample_rate
             ),
-            prepare_prompt(
-                SPEAKER_PROMPTS["conversational_b"]["text"],
+           prepare_prompt(
+                ("Well, they're not buying dollars. They're selling dollars. Gold is the safe haven. "
+                "They're not buying treasuries either, because I've said this before, when inflation is the threat, there is no safety in treasuries. "
+                "But the other problem, if the world now has moved away from dollars, away from treasuries, and away from Bitcoin, "
+                "not that they ever embraced it, but I'll get back into that, gold is the only safe haven standing."),
                 2,
-                SPEAKER_PROMPTS["conversational_b"]["audio"],
+                f"{data_dir()}/voices/peter.wav",
                 self.generator.sample_rate
             ),
             prepare_prompt(
