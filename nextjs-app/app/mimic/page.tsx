@@ -1,20 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
-import Image from "next/image";
-import { LiveAudioVisualizer } from "react-audio-visualize"; // Re-added import
+import { LiveAudioVisualizer } from "react-audio-visualize";
+import { useAudioRecorder } from "react-audio-voice-recorder";
 import { AudioPlayer } from "@/lib/audioplayer";
-
-// Define speaker data mapping - UPDATED based on user request and backend names
-const speakerData: { [key: string]: { name: string; image: string } } = {
-  "1": { name: "Kxi", image: "/1.jpg" }, // Moderator (originally speaker_id 0)
-  "2": { name: "Liq", image: "/2.jpg" }, // Originally speaker_id 1
-  "3": { name: "Kai", image: "/3.jpg" }, // Originally speaker_id 2
-  "4": { name: "Vivi", image: "/4.jpg" }, // Originally speaker_id 3
-  "5": { name: "Nn", image: "/5.jpg" }, // Originally speaker_id 4
-  // Add more speakers if needed, ensure image paths match
-};
+import { Mic, Square } from "lucide-react";
 
 // --- WebSocket Connection Status Type ---
 type WsConnectionStatus =
@@ -25,32 +15,42 @@ type WsConnectionStatus =
   | "error";
 
 export default function SpeakerPage() {
-  const params = useParams();
-  const speakerId = params?.speakerId as string; // Get speaker ID from route
+  const speakerId = "6";
 
-  const [speakerInfo, setSpeakerInfo] = useState<{
-    name: string;
-    image: string;
-  } | null>(null);
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
   const ws = useRef<WebSocket | null>(null);
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
+  const recorder = useAudioRecorder({ sampleRate: 24000, channelCount: 1 });
 
   useEffect(() => {
     setAudioPlayer(new AudioPlayer());
   }, []);
 
-  // Set speaker info based on ID
   useEffect(() => {
-    if (speakerId && speakerData[speakerId]) {
-      setSpeakerInfo(speakerData[speakerId]);
-    } else {
-      // Handle invalid/missing speaker ID
-      setSpeakerInfo({ name: "Unknown", image: "/default.jpg" }); // Provide a fallback image
+    if (!recorder.mediaRecorder || !ws.current) {
+      return;
     }
-  }, [speakerId]);
+
+    recorder.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size === 0) return;
+
+      e.data
+        .bytes()
+        .then((bytes) =>
+          ws.current?.send(
+            btoa(JSON.stringify({ type: "user_audio", payload: bytes }))
+          )
+        );
+    };
+
+    recorder.mediaRecorder.onstop = (e) => {
+      ws.current?.send(
+        btoa(JSON.stringify({ type: "user_audio_end", payload: {} }))
+      );
+    };
+  }, [recorder.mediaRecorder, ws.current]);
 
   // WebSocket Connection Effect
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function SpeakerPage() {
       }
       setWsStatus("closed");
     };
-  }, [speakerId, audioPlayer]);
+  }, [speakerId, audioPlayer]); // Added isSpeaking dependency to potentially update console logs
 
   const [isPlaying, setIsPlaying] = useState(false);
   useEffect(() => {
@@ -131,55 +131,59 @@ export default function SpeakerPage() {
       return;
     }
 
-    setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 100);
+    setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 10);
   }, [audioPlayer]);
-
-  if (!speakerInfo) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-        Loading speaker...
-      </div>
-    );
-  }
 
   return (
     // Use a relative container for absolute positioning of overlays
     <main className="relative min-h-screen w-full font-sans overflow-hidden text-white">
-      {/* Background Image */}
-      <Image
-        src={speakerInfo.image}
-        alt="Background"
-        fill // Fill the entire main container
-        style={{ objectFit: "cover" }} // Cover the area, potentially cropping
-        priority
-        unoptimized={speakerInfo.image.startsWith("/")}
-        sizes="100vw" // Image takes full viewport width
-        className="-z-10" // Place the image behind other content
-      />
-
       {/* Optional: Dark Scrim for Text Readability */}
       <div className="absolute inset-0 bg-black/30 -z-10"></div>
 
       {/* Status indicator & TEMP Toggle Button */}
       <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
         <span>
-          WS: {wsStatus} | ID: {speakerId} | Name: {speakerInfo?.name} |
-          Speaking: {isPlaying ? "Yes" : "No"}
+          WS: {wsStatus} | ID: {speakerId} | Speaking:{" "}
+          {isPlaying ? "Yes" : "No"}
         </span>
       </div>
 
       {/* Content Container (using flex to position items) */}
       <div className="relative z-10 flex flex-col h-screen justify-between p-6 md:p-10">
         {/* Top Area: Speaker Name */}
-        <div className="flex-grow flex items-start justify-center pt-10 md:pt-16">
+        <div className="flex items-start justify-center pt-10 md:pt-16">
           {" "}
           {/* Pushes name down slightly */}
           <h1
             className="text-7xl md:text-9xl font-bold whitespace-normal break-words text-center"
             style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }} // Add shadow for readability
           >
-            {speakerInfo.name}
+            Mimic
           </h1>
+        </div>
+        <div className="grow text-5xl flex place-items-center place-content-center">
+          <span>
+            Hello there, I am mimic. I will copy your voice and give myself
+            several compliments. I am not quite sure what text we should put
+            here, anything less than 30 seconds should work. Make sure the
+            content has a similar vibe all the way through that matches our
+            output prompt.
+          </span>
+        </div>
+        <div className="flex place-content-center">
+          <button
+            onClick={() =>
+              recorder.isRecording
+                ? recorder.stopRecording()
+                : recorder.startRecording()
+            }
+          >
+            {recorder.isRecording ? (
+              <Square className="size-20" />
+            ) : (
+              <Mic className="size-20" />
+            )}
+          </button>
         </div>
 
         {/* Bottom Area: Visualizer */}
@@ -187,7 +191,17 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
-          {audioPlayer && (
+          {recorder.mediaRecorder && (
+            <LiveAudioVisualizer
+              mediaRecorder={recorder.mediaRecorder}
+              width={500} // Adjust width as needed
+              height={75} // Adjust height as needed
+              barWidth={3}
+              gap={2}
+              barColor={"#f7f7f7"} // Example color
+            />
+          )}
+          {audioPlayer && isPlaying && (
             <LiveAudioVisualizer
               mediaRecorder={audioPlayer.getRecorder()}
               width={500} // Adjust width as needed

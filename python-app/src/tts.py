@@ -125,6 +125,18 @@ class TTS:
             # Generate content max 20 seconds in advance (not to overwhelm the client) 
             await asyncio.sleep(self.playAt - (current_time + 20))
 
+        prompt_segments = self.prompt_segments.copy()
+        mimic = speaker_id == 6
+        if mimic:
+            prompt_segments.append(prepare_prompt(
+                ("Hello there, I am mimic. I will copy your voice and give myself several compliments. "
+                "I am not quite sure what text we should put here, anything less than 30 seconds should work. "
+                "Make sure the content has a similar vibe all the way through that matches our output prompt."),
+                4,
+                f"{data_dir()}/voices/mimic.wav",
+                self.generator.sample_rate
+            ))
+
         audio_chunks = []
         for audio_chunk in self.generator.generate_stream(
             text=re.sub(r'[:;"*]| -', '', text), # Remove : ; " * -(with a space in front) characters as they mess up the speech
@@ -136,14 +148,16 @@ class TTS:
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
             await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id, "playAt": self.playAt, "chunk": chunk}})
             audio_chunks.append(audio_chunk)
-        audio_tensor = torch.cat(audio_chunks)
-        self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
 
-        output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
-        torchaudio.save(
-            output,
-            torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
-            self.generator.sample_rate
-        )
-        self.playAt += len(audio_chunks) * 20 * 0.08 + 0.5 # Wait 0.08s per fragment (20 in one batch) + 0.5s between fragments
-        return output
+        if not mimic:
+            audio_tensor = torch.cat(audio_chunks)
+            self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
+
+            output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
+            torchaudio.save(
+                output,
+                torch.cat([audio_tensor], dim=0).unsqueeze(0).cpu(),
+                self.generator.sample_rate
+            )
+            self.playAt += len(audio_chunks) * 20 * 0.08 + 0.5 # Wait 0.08s per fragment (20 in one batch) + 0.5s between fragments
+            return output

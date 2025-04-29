@@ -9,6 +9,7 @@ from env import data_dir
 import base64
 from tts import TTS
 from uagents import Agent, Bureau, Context, Model as UagentsModel
+import wave
 
 # --- Logging Setup (Keep as is) ---
 console_handler = logging.StreamHandler()
@@ -174,6 +175,9 @@ class PanelManager:
         self.message_counter = 0
         self.max_messages = 12
         self.current_debater_index = 0
+
+        # mimic
+        self.mimic_wav = None
 
         # --- REMOVE Bureau Initialization from __init__ ---
         # bureau_port = 8005
@@ -636,9 +640,22 @@ async def websocket_handler(request):
         # Loop to receive messages FROM the client (currently none expected)
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
-                 data = msg.data
+                 data = json.loads(base64.b64decode(bytes(msg.data, "ascii")).decode("utf-8"))
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received TEXT message: {data}")
                  # Optional: Handle commands sent FROM frontend via WS if needed later
+                 if data["type"] == "user_audio":
+                     if not panel_manager.mimic_wav:
+                        panel_manager.mimic_wav = wave.open(f"{data_dir()}/voices/mimic.wav", 'wb')
+                        panel_manager.mimic_wav.setnchannels(1)  # Mono
+                        panel_manager.mimic_wav.setsampwidth(2)  # 16-bit
+                        panel_manager.mimic_wav.setframerate(24000) 
+
+                     panel_manager.mimic_wav.writeframes(data["payload"])
+                     if data["type"] == "user_audio_end":
+                         panel_manager.mimic_wav.close()
+                         panel_manager.mimic_wav = None
+
+                         await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I'm you. I think Samuel deserves a raise.", 6, panel_manager.broadcast_message)
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
                  # Handle binary data if needed later
