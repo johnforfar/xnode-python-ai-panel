@@ -8,7 +8,6 @@ from generator import Segment, load_csm_1b
 import asyncio
 import numpy as np
 import time
-from datetime import datetime
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
@@ -83,10 +82,10 @@ class TTS:
                 self.generator.sample_rate
             ),
             prepare_prompt(
-                ("It's the rule of 72, right? You divide 7% into 72. That's the half life of the asset. "
-                "The half life of your wealth is 10 years if you store it in cash. "
-                "If someone gives you an asset you can invest in that goes up 7% a year, you're keeping up with inflation. "
-                "You're not getting wealthier, but you're not getting poorer. You're just treading water."),
+                ("Remember George Washington? You know how he died? Well-meaning physicians bled him to death. "
+                "And this was the most important patient in the country, maybe in the history of the country. "
+                "And we bled him to death trying to help him. So when you're actually inflating the money supply at 7%, but you're calling it 2% "
+                "because you want to help the economy, you're literally bleeding the free market to death."),
                 1,
                 f"{data_dir()}/voices/michael.wav",
                 self.generator.sample_rate
