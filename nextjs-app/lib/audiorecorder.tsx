@@ -19,7 +19,7 @@ export class AudioRecorder {
     processorNode.connect(this.audioContext.destination);
 
     processorNode.onaudioprocess = (e) => {
-      if (!this.recorder) {
+      if (!this.recording) {
         return;
       }
 
