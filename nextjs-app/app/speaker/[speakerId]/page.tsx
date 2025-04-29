@@ -131,7 +131,7 @@ export default function SpeakerPage() {
       return;
     }
 
-    setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 100);
+    setInterval(() => setIsPlaying(audioPlayer.isPlaying()), 10);
   }, [audioPlayer]);
 
   if (!speakerInfo) {
