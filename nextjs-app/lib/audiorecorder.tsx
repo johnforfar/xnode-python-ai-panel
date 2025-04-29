@@ -17,6 +17,9 @@ export class AudioRecorder {
       audio: { sampleRate: 24000, channelCount: 1 },
     });
     this.recorder = new MediaRecorder(stream);
+    if (this.recorder.state === "recording") {
+      this.recorder.stop();
+    }
     this.onStop = onStop;
 
     const microphone = this.audioContext.createMediaStreamSource(stream);
@@ -44,10 +47,12 @@ export class AudioRecorder {
 
   public start() {
     this.recording = true;
+    this.recorder?.start();
   }
 
   public stop() {
     this.recording = false;
+    this.recorder?.stop();
     this.onStop?.();
   }
 }

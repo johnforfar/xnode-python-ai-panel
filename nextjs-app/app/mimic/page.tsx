@@ -32,41 +32,46 @@ export default function SpeakerPage() {
   }, []);
 
   useEffect(() => {
-    const recorder = new AudioRecorder();
-    recorder
-      .init({
-        onAudio: (audio) => {
-          if (echo) {
-            audioPlayer?.queueFragment(0, Array.from(audio));
-            return;
-          }
+    setAudioRecorder(new AudioRecorder());
+  }, []);
 
-          ws.current?.send(
-            btoa(
-              JSON.stringify({
-                type: "user_audio",
-                payload: Array.from(audio),
-              })
+  useEffect(() => {
+    if (!audioRecorder || !ws.current || !audioPlayer) {
+      return;
+    }
+
+    audioRecorder.init({
+      onAudio: (audio) => {
+        if (echo) {
+          audioPlayer?.queueFragment(0, Array.from(audio));
+          return;
+        }
+
+        ws.current?.send(
+          btoa(
+            JSON.stringify({
+              type: "user_audio",
+              payload: Array.from(audio),
+            })
+          )
+        );
+      },
+      onStop: () => {
+        if (!echo) {
+          new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
+            ws.current?.send(
+              btoa(
+                JSON.stringify({
+                  type: "user_audio_end",
+                  payload: {},
+                })
+              )
             )
           );
-        },
-        onStop: () => {
-          if (!echo) {
-            new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
-              ws.current?.send(
-                btoa(
-                  JSON.stringify({
-                    type: "user_audio_end",
-                    payload: {},
-                  })
-                )
-              )
-            );
-          }
-        },
-      })
-      .then(() => setAudioRecorder(recorder));
-  }, [ws.current, audioPlayer, echo]);
+        }
+      },
+    });
+  }, [audioRecorder, ws.current, audioPlayer, echo]);
 
   // WebSocket Connection Effect
   useEffect(() => {
