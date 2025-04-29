@@ -53,6 +53,20 @@ export default function SpeakerPage() {
           )
         );
       },
+      onStop: () => {
+        if (!echo) {
+          new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
+            ws.current?.send(
+              btoa(
+                JSON.stringify({
+                  type: "user_audio_end",
+                  payload: {},
+                })
+              )
+            )
+          );
+        }
+      },
     });
     setAudioRecorder(recorder);
   }, [ws.current, audioPlayer, echo]);
@@ -198,17 +212,6 @@ export default function SpeakerPage() {
               isRecording
                 ? () => {
                     audioRecorder?.stop();
-                    new Promise((resolve) => setTimeout(resolve, 200)).then(
-                      () =>
-                        ws.current?.send(
-                          btoa(
-                            JSON.stringify({
-                              type: "user_audio_end",
-                              payload: {},
-                            })
-                          )
-                        )
-                    );
                   }
                 : () => {
                     audioRecorder?.start();
