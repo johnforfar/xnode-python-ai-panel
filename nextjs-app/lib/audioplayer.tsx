@@ -8,7 +8,7 @@ export interface QueuedAudio {
 export class AudioPlayer {
   private queue: QueuedAudio[] = [];
   private audioContext = new AudioContext();
-  private playing = false;
+  private state: "idle" | "queued" | "playing" = "idle";
   private output = this.audioContext.createMediaStreamDestination();
   private recorder = new MediaRecorder(this.output.stream);
 
@@ -28,13 +28,13 @@ export class AudioPlayer {
       this.queue.push({ playAt, data: fragment });
     }
 
-    if (!this.playing) {
+    if (this.state === "idle") {
       this.processAudioPlaybackQueue().catch(console.error);
     }
   }
 
   public isPlaying() {
-    return this.playing;
+    return this.state === "playing";
   }
 
   public getRecorder() {
@@ -45,7 +45,7 @@ export class AudioPlayer {
     return {
       queue: this.queue,
       audioContext: this.audioContext,
-      playing: this.playing,
+      state: this.state,
       output: this.output,
       recorder: this.recorder,
     };
@@ -55,12 +55,11 @@ export class AudioPlayer {
     const nextChunk = this.queue.shift();
     if (!nextChunk) {
       console.log("No more chunks to play, stopping...");
-      this.playing = false;
+      this.state = "idle";
       return;
     }
 
     try {
-      this.playing = true;
       await this.playAudioChunk(nextChunk);
     } catch (err) {
       console.error("Error playing audio chunk:", err);
@@ -74,11 +73,13 @@ export class AudioPlayer {
     const delay = audioData.playAt * 1000 - Date.now();
 
     if (delay > 0) {
+      this.state = "queued";
       await new Promise((resolve) => {
         console.log(`Playing next fragment in ${delay}ms`);
         setTimeout(resolve, delay);
       });
     } else {
+      this.state = "playing";
       console.log(`Playing fragment ${delay}ms late`);
     }
 
