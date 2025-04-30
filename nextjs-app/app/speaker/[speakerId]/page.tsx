@@ -144,8 +144,9 @@ export default function SpeakerPage() {
 
   return (
     // Use a relative container for absolute positioning of overlays
-    <main className="relative min-h-screen w-full font-sans overflow-hidden text-white">
-      {/* Background Image */}
+    <main className={`relative min-h-screen w-full font-sans overflow-hidden text-white speaker-background ${isPlaying ? "speaking" : ""}`}>
+      {/* Background Image - REMOVED */}
+      {/*
       <Image
         src={speakerInfo.image}
         alt="Background"
@@ -156,12 +157,13 @@ export default function SpeakerPage() {
         sizes="100vw" // Image takes full viewport width
         className="-z-10" // Place the image behind other content
       />
+      */}
 
-      {/* Optional: Dark Scrim for Text Readability */}
-      <div className="absolute inset-0 bg-black/30 -z-10"></div>
+      {/* Optional: Dark Scrim for Text Readability - REMOVED */}
+      {/* <div className="absolute inset-0 bg-black/30 -z-10"></div> */}
 
       {/* Status indicator & TEMP Toggle Button */}
-      <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
+      <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1 status-indicator">
         <span>
           WS: {wsStatus} | ID: {speakerId} | Name: {speakerInfo?.name} |
           Speaking: {isPlaying ? "Yes" : "No"}
@@ -169,13 +171,13 @@ export default function SpeakerPage() {
       </div>
 
       {/* Content Container (using flex to position items) */}
-      <div className="relative z-10 flex flex-col h-screen p-6 md:p-10">
+      <div className="relative z-10 flex flex-col h-screen p-6 md:p-10 speaker-content-container">
         {/* Top Area: Speaker Name */}
         <div className="flex items-start justify-center pt-10 md:pt-16">
           {" "}
           {/* Pushes name down slightly */}
           <h1
-            className="text-7xl md:text-9xl font-bold whitespace-normal break-words text-center"
+            className="text-7xl md:text-9xl font-bold whitespace-normal break-words text-center speaker-name"
             style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }} // Add shadow for readability
           >
             {speakerInfo.name}

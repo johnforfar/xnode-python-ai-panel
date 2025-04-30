@@ -120,3 +120,62 @@ td {
 td {
   padding: 4px;
 }
+
+/* Gradient Background Animation for Speaker Page - Linear Style */
+main.speaker-background {
+  position: relative;
+  /* Default: Animated Gray Gradient */
+  background: linear-gradient(
+    180deg,
+    #333333 0%, /* Dark Gray */
+    #555555 30%,
+    #777777 60%,
+    #999999 100% /* Lighter Gray */
+  );
+  background-size: 300% 300%; /* Larger size for more movement */
+  animation: idle-gradient-animation 10s ease infinite;
+  transition: background 0.8s ease-in-out;
+}
+
+main.speaker-background.speaking {
+  /* Speaking: Animated Green Gradient */
+  background: linear-gradient(
+    180deg, /* Vertical flow */
+    #004d00 0%,  /* Darker Green */
+    #008000 30%, /* Mid Green */
+    #00cc00 60%, /* Brighter Green */
+    #90ee90 100% /* Light Green */
+  );
+  background-size: 300% 300%; /* Match idle size */
+  animation: speaking-gradient-animation 7s ease infinite;
+}
+
+/* Keyframes for the IDLE (Gray) state - more complex movement */
+@keyframes idle-gradient-animation {
+  0% { background-position: 0% 0%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+/* Keyframes for the SPEAKING (Green) state - more complex movement */
+@keyframes speaking-gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Ensure content remains visible */
+.speaker-content-container {
+  position: relative;
+  z-index: 10;
+}
+
+/* Add text shadow for better readability on dynamic background */
+.speaker-name {
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+}
+.status-indicator span {
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+}
