@@ -46,7 +46,8 @@ async def play(broadcast_message):
         
         await broadcast_message({"type": "conversation_history", "payload": {"history": history}})
         audio_file = torchaudio.load(f"{data_dir()}/static{audio}")
-        chunk = audio_file.numpy().astype(np.float32).tolist()
+        print(audio_file)
+        chunk = np.array(audio_file).astype(np.float32).tolist()
         await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id[message["speaker"]], "playAt": playAt, "chunk": chunk}})
         playAt += len(chunk) * 0.08 + 0.5
 
