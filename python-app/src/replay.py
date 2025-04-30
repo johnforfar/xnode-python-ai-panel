@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-import wave
+import torchaudio
 from env import data_dir
 from tts import TTS
 import os
@@ -43,13 +43,12 @@ async def play(broadcast_message):
             "audioUrl": audio,
         })
 
-        audio_file = wave.open(f"{data_dir()}/static{audio}",'r')
-        frames = audio_file.getnframes()
-        rate = audio_file.getframerate()
-        duration = frames / float(rate)
+        
         await broadcast_message({"type": "conversation_history", "payload": {"history": history}})
-        await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id[message["speaker"]], "playAt": playAt, "chunk": (np.array(audio_file.readframes(frames)).astype(np.int16) / 32767).astype(np.float32).tolist()}})
-        playAt += duration + 0.5
+        audio_file = torchaudio.load(f"{data_dir()}/static{audio}")
+        chunk = audio_file.cpu().numpy().astype(np.float32).tolist()
+        await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id[message["speaker"]], "playAt": playAt, "chunk": chunk}})
+        playAt += len(chunk) * 0.08 + 0.5
 
 async def broadcast_mock(message):
      return
