@@ -5,6 +5,7 @@ from env import data_dir
 from tts import TTS
 import os
 import numpy as np
+import asyncio
 
 script = [
     {"speaker": "Kxi", "line": "Alright folks, let's pause the high-stakes debate for a quick 'Fun Segment'! We asked our panelists for their secret crypto confessions."},
@@ -61,4 +62,4 @@ async def generate():
          print(f"Generated replay message {i+1}/{len(script)}")
 
 if __name__ == '__main__':
-        generate()
+    asyncio.run(generate())
