@@ -33,7 +33,8 @@ export default function SpeakerPage() {
 
   useEffect(() => {
     const recorder = new AudioRecorder();
-    recorder.init().then(() => setAudioRecorder(recorder));
+    recorder.init().catch(console.error);
+    setAudioRecorder(recorder);
   }, []);
 
   useEffect(() => {
@@ -190,39 +191,7 @@ export default function SpeakerPage() {
           |{" "}
           <button
             onClick={() => {
-              audioRecorder?.init();
-              audioRecorder?.update({
-                onAudio: (audio) => {
-                  if (echo) {
-                    audioPlayer?.queueFragment(0, Array.from(audio));
-                    return;
-                  }
-
-                  ws.current?.send(
-                    btoa(
-                      JSON.stringify({
-                        type: "user_audio",
-                        payload: Array.from(audio),
-                      })
-                    )
-                  );
-                },
-                onStop: () => {
-                  if (!echo) {
-                    new Promise((resolve) => setTimeout(resolve, 200)).then(
-                      () =>
-                        ws.current?.send(
-                          btoa(
-                            JSON.stringify({
-                              type: "user_audio_end",
-                              payload: {},
-                            })
-                          )
-                        )
-                    );
-                  }
-                },
-              });
+              audioRecorder?.init().catch(console.error);
             }}
           >
             Refresh Mic
