@@ -43,7 +43,7 @@ async def play(broadcast_message):
             "audioUrl": audio,
         })
 
-        audio_file = wave.open(f"{data_dir()}/static/{audio}",'r')
+        audio_file = wave.open(f"{data_dir()}/static{audio}",'r')
         frames = audio_file.getnframes()
         rate = audio_file.getframerate()
         duration = frames / float(rate)

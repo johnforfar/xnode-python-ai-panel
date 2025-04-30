@@ -123,7 +123,7 @@ class TTS:
             audio_chunks.append(audio_chunk)
 
         if not mimic:
-            audio_tensor = torch.cat(audio_chunks)
+            audio_tensor = torch.cat((audio_chunks * 32767).astype(np.int16))
             self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
 
             output = f"{data_dir()}/static/audio/{len(self.generated_segments)}.wav"
