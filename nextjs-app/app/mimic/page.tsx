@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import { AudioPlayer } from "@/lib/audioplayer";
 import { Mic, Square } from "lucide-react";

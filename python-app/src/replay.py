@@ -9,16 +9,16 @@ import asyncio
 
 script = [
     {"speaker": "Kxi", "line": "Alright folks, let's pause the high-stakes debate for a quick 'Fun Segment'! We asked our panelists for their secret crypto confessions."},
-    {"speaker": "Kai", "line": "Confession? Fine. I once almost bought a Bitcoin... back in 2011. Decided gold was safer. (Scoffs) Still think I was right."},
-    {"speaker": "Liq", "line": "Oh, Kai, still polishing those pet rocks? My confession: I tried explaining Bitcoin to my cat. He just stared blankly. Clearly, he works for the fiat system."},
-    {"speaker": "Vivi", "line": "My turn. I designed Bitcoin... but I still sometimes forget my private keys. Had to reset my hardware wallet password last week. Embarrassing."},
-    {"speaker": "Nn", "line": "Forget keys? Sad! My confession? I told everyone I invented Bitcoin. Tremendous idea, folks! Everyone believed me. Mostly."},
-    {"speaker": "Kxi", "line": "Nn, claiming inventions again? Shocking! Okay, Kai, quick - if Bitcoin hit $1 million tomorrow, what would you really do?"},
-    {"speaker": "Kai", "line": "...Buy more gold. Obviously. Maybe a slightly bigger vault."},
-    {"speaker": "Liq", "line": "(Laughing) He'd secretly buy Bitcoin and pretend it was gold-plated! Classic Kai."},
-    {"speaker": "Vivi", "line": "Logically, at $1 million, volatility might decrease, making it a more stable asset layer. Interesting data point."},
-    {"speaker": "Nn", "line": "One million? We're going to ten million, folks! Believe me! I'd build a huge, beautiful Bitcoin tower! The best tower!"},
-    {"speaker": "Kxi", "line": "A Bitcoin tower... okay Nn. And that concludes our very revealing 'Fun Segment'! Back to the serious debate... or maybe not!"},
+    {"speaker": "Kai", "line": "I once almost bought a Bitcoin back in 2011. Decided gold was safer and I still think I was right."},
+    {"speaker": "Liq", "line": "Oh, Kai, still polishing those pet rocks? I tried explaining Bitcoin to my cat. He just stared blankly, clearly he works for the fiat system."},
+    {"speaker": "Vivi", "line": "I designed Bitcoin, but I still sometimes forget my private keys. Had to reset my hardware wallet password last week."},
+    {"speaker": "Nn", "line": "I told everyone I invented Bitcoin. Tremendous idea, everyone believed me, except the stupid people."},
+    {"speaker": "Kxi", "line": "On to the next topic! If Bitcoin hit 1 million dollars tomorrow, what would you do?"},
+    {"speaker": "Kai", "line": "Buy more gold, obviously! Maybe a slightly bigger vault."},
+    {"speaker": "Liq", "line": "He'd secretly buy Bitcoin and pretend it was gold-plated! Don't try to deny it Kai."},
+    {"speaker": "Vivi", "line": "Logically at $1 million volatility might decrease, making it a more stable asset layer. I would be very interested to see how the market will change."},
+    {"speaker": "Nn", "line": "I'm not selling until it hits ten million. Folks, marks my words, I'll build a huge beautiful Bitcoin tower!"},
+    {"speaker": "Kxi", "line": " And that concludes our very revealing 'Fun Segment'! Back to you Ashton!"},
 ]
 
 speaker_id = {"Kxi": 0, "Kai": 1, "Liq": 2, "Vivi": 3, "Nn": 4}
