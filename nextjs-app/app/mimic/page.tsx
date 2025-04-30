@@ -187,7 +187,46 @@ export default function SpeakerPage() {
           <button onClick={() => setEcho(!echo)}>
             Echo: {echo ? "On" : "Off"}
           </button>{" "}
-          | <button onClick={() => audioRecorder?.init()}>Refresh Mic</button>
+          |{" "}
+          <button
+            onClick={() => {
+              audioRecorder?.init();
+              audioRecorder?.update({
+                onAudio: (audio) => {
+                  if (echo) {
+                    audioPlayer?.queueFragment(0, Array.from(audio));
+                    return;
+                  }
+
+                  ws.current?.send(
+                    btoa(
+                      JSON.stringify({
+                        type: "user_audio",
+                        payload: Array.from(audio),
+                      })
+                    )
+                  );
+                },
+                onStop: () => {
+                  if (!echo) {
+                    new Promise((resolve) => setTimeout(resolve, 200)).then(
+                      () =>
+                        ws.current?.send(
+                          btoa(
+                            JSON.stringify({
+                              type: "user_audio_end",
+                              payload: {},
+                            })
+                          )
+                        )
+                    );
+                  }
+                },
+              });
+            }}
+          >
+            Refresh Mic
+          </button>
         </span>
       </div>
 
