@@ -7,7 +7,7 @@ import { Mic, Square } from "lucide-react";
 import { AudioRecorder } from "@/lib/audiorecorder";
 
 const mimic_input =
-  "Hello there, I am mimic. I will copy your voice and give myself several compliments. I bet you can't wait to see how the result turns out. I am not quite sure what text we should put here, anything less than 30 seconds should work. Make sure the content has a similar vibe all the way through that matches our output prompt.";
+  "Hello there, I am mimic. I will copy your voice and give myself several compliments. I bet you can't wait to see how the result turns out. I am not quite sure what text we should put here, anything less than 30 seconds should work. Make sure the content has a similar vibe all the way through that matches the output prompt.";
 const mimic_output =
   "Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.";
 
