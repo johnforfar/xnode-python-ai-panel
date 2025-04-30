@@ -57,8 +57,8 @@ async def broadcast_mock(message):
 async def generate():
     tts = TTS()
     for i, message in enumerate(script):
-         tts.generate_audio(message["line"], speaker_id[message["speaker"]], broadcast_mock, False)
-         os.rename(f"{data_dir()}/static/audio/{i+1}.wav", f"{data_dir()}/static/audio/replay/{i}.wav")
+         file = await tts.generate_audio(message["line"], speaker_id[message["speaker"]], broadcast_mock, False)
+         os.rename(file, f"{data_dir()}/static/audio/replay/{i}.wav")
          print(f"Generated replay message {i+1}/{len(script)}")
 
 if __name__ == '__main__':
