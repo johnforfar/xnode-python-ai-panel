@@ -650,7 +650,7 @@ async def websocket_handler(request):
                      for socket in [x for x in panel_manager.websockets if x["socket"] == ws]:
                          socket["events"].append(data["payload"])
                  if data["type"] == "user_audio":
-                     mimic_id = data["payload"]["id"]
+                     mimic_id = str(data["payload"]["id"])
                      if not panel_manager.mimic_wav[mimic_id]:
                         panel_manager.mimic_wav[mimic_id] = wave.open(f"{data_dir()}/voices/mimic-{mimic_id}.wav", 'wb')
                         panel_manager.mimic_wav[mimic_id].setnchannels(1)
@@ -659,7 +659,7 @@ async def websocket_handler(request):
 
                      panel_manager.mimic_wav["mimic_id"].writeframes((np.array(data["payload"]["audio"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
                  if data["type"] == "user_audio_end":
-                    mimic_id = data["payload"]["id"]
+                    mimic_id = str(data["payload"]["id"])
                     if panel_manager.mimic_wav[mimic_id]:
                         panel_manager.mimic_wav[mimic_id].close()
                         panel_manager.mimic_wav[mimic_id] = None
