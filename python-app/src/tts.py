@@ -89,7 +89,7 @@ class TTS:
 
         self.playAt = 0
 
-    async def generate_audio(self, text, speaker_id, broadcast_message, usePlayAt = True):
+    async def generate_audio(self, text, speaker_id, broadcast_message, usePlayAt = True, extraContext = []):
         if usePlayAt:
             current_time = int(time.time()) 
             self.playAt = max(current_time + 10, self.playAt) # Set to current time (if lower than playAt)
@@ -97,25 +97,14 @@ class TTS:
                 # Generate content max 20 seconds in advance (not to overwhelm the client) 
                 await asyncio.sleep(self.playAt - (current_time + 20))
 
-        prompt_segments = self.prompt_segments.copy()
-        mimic = speaker_id == 6
-        if mimic:
-            prompt_segments.append(prepare_prompt(
-                ("Hello there, I am mimic. I will copy your voice and give myself several compliments. "
-                "I bet you can't wait to see how the result turns out. "
-                "I am not quite sure what text we should put here, anything less than 30 seconds should work. "
-                "Make sure the content has a similar vibe all the way through that matches our output prompt."),
-                6,
-                f"{data_dir()}/voices/mimic.wav",
-                24000
-            ))
+        mimic = speaker_id > 5
 
         audio_chunks = []
         for audio_chunk in self.generator.generate_stream(
             text=re.sub(r'\.\.\.| - |; |: |---', ', ', re.sub(r'["*]', '', text)), # Remove/replace some characters as they mess up the speech
             speaker=speaker_id,
             # Only add this speakers prompt to context
-            context=next(([item] for item in prompt_segments if item.speaker == speaker_id), []),
+            context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + extraContext,
             max_audio_length_ms=30_000,
         ):
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()

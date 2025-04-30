@@ -7,7 +7,7 @@ import json
 import aiohttp
 from env import data_dir
 import base64
-from tts import TTS
+from tts import TTS, prepare_prompt
 from uagents import Agent, Bureau, Context, Model as UagentsModel
 import wave
 import numpy as np
@@ -181,7 +181,7 @@ class PanelManager:
         self.current_debater_index = 0
 
         # mimic
-        self.mimic_wav = None
+        self.mimic_wav = {}
 
         # --- REMOVE Bureau Initialization from __init__ ---
         # bureau_port = 8005
@@ -650,21 +650,34 @@ async def websocket_handler(request):
                      for socket in [x for x in panel_manager.websockets if x["socket"] == ws]:
                          socket["events"].append(data["payload"])
                  if data["type"] == "user_audio":
-                     if not panel_manager.mimic_wav:
-                        panel_manager.mimic_wav = wave.open(f"{data_dir()}/voices/mimic.wav", 'wb')
-                        panel_manager.mimic_wav.setnchannels(1)
-                        panel_manager.mimic_wav.setsampwidth(2)
-                        panel_manager.mimic_wav.setframerate(24000) 
+                     mimic_id = data["payload"]["id"]
+                     if not panel_manager.mimic_wav[mimic_id]:
+                        panel_manager.mimic_wav[mimic_id] = wave.open(f"{data_dir()}/voices/mimic-{mimic_id}.wav", 'wb')
+                        panel_manager.mimic_wav[mimic_id].setnchannels(1)
+                        panel_manager.mimic_wav[mimic_id].setsampwidth(2)
+                        panel_manager.mimic_wav[mimic_id].setframerate(24000) 
 
-                     panel_manager.mimic_wav.writeframes((np.array(data["payload"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
+                     panel_manager.mimic_wav["mimic_id"].writeframes((np.array(data["payload"]["audio"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
                  if data["type"] == "user_audio_end":
-                    panel_manager.mimic_wav.close()
-                    panel_manager.mimic_wav = None
+                    mimic_id = data["payload"]["id"]
+                    if panel_manager.mimic_wav[mimic_id]:
+                        panel_manager.mimic_wav[mimic_id].close()
+                        panel_manager.mimic_wav[mimic_id] = None
 
-                    logger.info("Start generating mimic")
-                    if torch.cuda.is_available():
-                        await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.", 6, panel_manager.broadcast_message, False)
-                    logger.info("Finish streaming mimic")
+                        logger.info("Start generating mimic")
+                        if torch.cuda.is_available():
+                            mimic_input = data["payload"]["mimic_input"]
+                            mimic_output = data["payload"]["mimic_output"]
+                            context = [
+                                prepare_prompt(
+                                    mimic_input,
+                                    mimic_id,
+                                    f"{data_dir()}/voices/mimic-{mimic_id}.wav",
+                                    24000
+                                )
+                            ]
+                            await panel_manager.tts.generate_audio(mimic_output, mimic_id, panel_manager.broadcast_message, False, context)
+                        logger.info("Finish streaming mimic")
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
                  # Handle binary data if needed later

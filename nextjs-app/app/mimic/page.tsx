@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import { AudioPlayer } from "@/lib/audioplayer";
 import { Mic, Square } from "lucide-react";
 import { AudioRecorder } from "@/lib/audiorecorder";
+
+const mimic_input =
+  "Hello there, I am mimic. I will copy your voice and give myself several compliments. I bet you can't wait to see how the result turns out. I am not quite sure what text we should put here, anything less than 30 seconds should work. Make sure the content has a similar vibe all the way through that matches our output prompt.";
+const mimic_output =
+  "Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.";
 
 // --- WebSocket Connection Status Type ---
 type WsConnectionStatus =
@@ -15,7 +20,9 @@ type WsConnectionStatus =
   | "error";
 
 export default function SpeakerPage() {
-  const speakerId = "6";
+  const speakerId = useMemo(() => {
+    return Math.floor(Math.random() * 1_000_000 + 6);
+  }, []);
 
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
   const ws = useRef<WebSocket | null>(null);
@@ -53,7 +60,7 @@ export default function SpeakerPage() {
           btoa(
             JSON.stringify({
               type: "user_audio",
-              payload: Array.from(audio),
+              payload: { id: speakerId, audio: Array.from(audio) },
             })
           )
         );
@@ -65,7 +72,7 @@ export default function SpeakerPage() {
               btoa(
                 JSON.stringify({
                   type: "user_audio_end",
-                  payload: {},
+                  payload: { id: speakerId, mimic_input, mimic_output },
                 })
               )
             )
@@ -213,13 +220,7 @@ export default function SpeakerPage() {
           </h1>
         </div>
         <div className="grow text-5xl flex place-items-center place-content-center">
-          <span>
-            Hello there, I am mimic. I will copy your voice and give myself
-            several compliments. I bet you can't wait to see how the result
-            turns out. I am not quite sure what text we should put here,
-            anything less than 30 seconds should work. Make sure the content has
-            a similar vibe all the way through that matches our output prompt.
-          </span>
+          <span>{mimic_input}</span>
         </div>
         <div className="flex place-content-center">
           <button
