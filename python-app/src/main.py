@@ -662,7 +662,7 @@ async def websocket_handler(request):
                     mimic_id = data["payload"]["id"]
                     if mimic_id in panel_manager.mimic_wav:
                         panel_manager.mimic_wav[mimic_id].close()
-                        panel_manager.mimic_wav[mimic_id] = None
+                        del panel_manager.mimic_wav[mimic_id]
 
                         logger.info("Start generating mimic")
                         if torch.cuda.is_available():
