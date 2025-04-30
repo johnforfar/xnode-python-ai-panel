@@ -104,7 +104,7 @@ export default function SpeakerPage() {
       );
       setWsStatus("open");
       // Subscribe to mimic speaker
-      [6].forEach((speaker) =>
+      [speakerId].forEach((speaker) =>
         socket.send(
           btoa(JSON.stringify({ type: "subscribe", payload: speaker }))
         )
