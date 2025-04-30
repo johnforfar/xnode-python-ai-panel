@@ -48,7 +48,7 @@ async def play(broadcast_message):
         audio_data, sample_rate = torchaudio.load(f"{data_dir()}/static{audio}")
         chunk = audio_data.squeeze(0).numpy().astype(np.float32).tolist()
         await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id[message["speaker"]], "playAt": playAt, "chunk": chunk}})
-        playAt += len(chunk) * 0.08 + 0.5
+        playAt += (len(chunk) / 24000) + 0.5
 
 async def broadcast_mock(message):
      return
