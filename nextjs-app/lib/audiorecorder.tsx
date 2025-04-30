@@ -7,13 +7,19 @@ export class AudioRecorder {
   private onAudio: ((audio: Float32Array) => void) | undefined;
   private onStop: (() => void) | undefined;
 
-  public async init({
-    onAudio,
-    onStop,
-  }: {
-    onAudio?: (audio: Float32Array) => void;
-    onStop?: () => void;
-  }) {
+  private oldNodes:
+    | {
+        microphone: MediaStreamAudioSourceNode;
+        processorNode: ScriptProcessorNode;
+      }
+    | undefined = undefined;
+
+  public async init() {
+    if (this.oldNodes) {
+      this.oldNodes.microphone.disconnect();
+      this.oldNodes.processorNode.disconnect();
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { sampleRate: 24000, channelCount: 1 },
     });
@@ -21,8 +27,6 @@ export class AudioRecorder {
     if (this.recorder.state === "recording") {
       this.recorder.stop();
     }
-    this.onAudio = onAudio;
-    this.onStop = onStop;
 
     const microphone = this.audioContext.createMediaStreamSource(stream);
 
@@ -37,6 +41,8 @@ export class AudioRecorder {
 
       this.onAudio?.(e.inputBuffer.getChannelData(0));
     };
+
+    this.oldNodes = { microphone, processorNode };
   }
 
   public getRecorder() {

@@ -33,7 +33,7 @@ export default function SpeakerPage() {
 
   useEffect(() => {
     const recorder = new AudioRecorder();
-    recorder.init({}).then(() => setAudioRecorder(recorder));
+    recorder.init().then(() => setAudioRecorder(recorder));
   }, []);
 
   useEffect(() => {
@@ -186,7 +186,8 @@ export default function SpeakerPage() {
           {isPlaying ? "Yes" : "No"} |{" "}
           <button onClick={() => setEcho(!echo)}>
             Echo: {echo ? "On" : "Off"}
-          </button>
+          </button>{" "}
+          | <button onClick={() => audioRecorder?.init()}>Refresh Mic</button>
         </span>
       </div>
 
