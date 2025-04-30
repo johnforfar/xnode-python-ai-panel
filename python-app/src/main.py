@@ -660,6 +660,7 @@ async def websocket_handler(request):
                      panel_manager.mimic_wav["mimic_id"].writeframes((np.array(data["payload"]["audio"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
                  if data["type"] == "user_audio_end":
                     mimic_id = str(data["payload"]["id"])
+                    speaker_id = data["payload"]["id"]
                     if panel_manager.mimic_wav[mimic_id]:
                         panel_manager.mimic_wav[mimic_id].close()
                         panel_manager.mimic_wav[mimic_id] = None
@@ -671,12 +672,12 @@ async def websocket_handler(request):
                             context = [
                                 prepare_prompt(
                                     mimic_input,
-                                    mimic_id,
+                                    speaker_id,
                                     f"{data_dir()}/voices/mimic-{mimic_id}.wav",
                                     24000
                                 )
                             ]
-                            await panel_manager.tts.generate_audio(mimic_output, mimic_id, panel_manager.broadcast_message, False, context)
+                            await panel_manager.tts.generate_audio(mimic_output, speaker_id, panel_manager.broadcast_message, False, context)
                         logger.info("Finish streaming mimic")
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")
