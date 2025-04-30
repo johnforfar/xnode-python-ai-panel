@@ -11,6 +11,7 @@ from tts import TTS
 from uagents import Agent, Bureau, Context, Model as UagentsModel
 import wave
 import numpy as np
+import torch
 
 # --- Logging Setup (Keep as is) ---
 console_handler = logging.StreamHandler()
@@ -160,7 +161,8 @@ class PanelManager:
         self.bureau = None      # Initialize Bureau as None here
 
         # --- Initialize TTS ---
-        self.tts = TTS()
+        if torch.cuda.is_available():
+            self.tts = TTS()
         # --- End TTS Initialization ---
 
         # --- Agent Speaker and Prompt Maps ---
@@ -342,8 +344,9 @@ class PanelManager:
         await self.broadcast_message({"type": message_type, "payload": message_payload})
 
         # Trigger background audio generation
-        logger.info(f"Creating background task for TTS generation for {timestamp}")
-        await self.generate_and_broadcast_audio(message_payload)
+        if torch.cuda.is_available():
+            logger.info(f"Creating background task for TTS generation for {timestamp}")
+            await self.generate_and_broadcast_audio(message_payload)
 
         # --- FIX: Check limit AFTER processing debater response ---
         if not is_moderator and self.message_counter >= self.max_messages:
@@ -657,7 +660,8 @@ async def websocket_handler(request):
                     panel_manager.mimic_wav = None
 
                     logger.info("Start generating mimic")
-                    await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.", 6, panel_manager.broadcast_message, False)
+                    if torch.cuda.is_available():
+                        await panel_manager.tts.generate_audio("Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.", 6, panel_manager.broadcast_message, False)
                     logger.info("Finish streaming mimic")
             elif msg.type == WSMsgType.BINARY:
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received BINARY message (length: {len(msg.data)}).")

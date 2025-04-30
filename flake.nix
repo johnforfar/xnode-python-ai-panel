@@ -170,6 +170,7 @@
                 #export DB_USER=postgres
                 #export DB_PASS=postgres
                 export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib;/run/opengl-driver/lib"
+                export DATADIR=$PWD
                 
                 $BACKEND_EXE &
                 BACKEND_PID=$!
