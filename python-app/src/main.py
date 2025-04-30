@@ -221,7 +221,7 @@ class PanelManager:
             if ws["socket"] == exclude_sender: continue # Skip the excluded sender
             if not ws["socket"].closed:
                 if type != "audio" or message_data["payload"]["speaker"] in ws["events"]: # Only send audio event to clients subscribed to that speaker
-                    tasks.append(ws.send_str(message_json))
+                    tasks.append(ws["socket"].send_str(message_json))
             else:
                 closed_sockets.append(ws["socket"]) # Collect closed sockets for removal later
 
