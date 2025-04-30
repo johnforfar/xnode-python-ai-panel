@@ -657,7 +657,7 @@ async def websocket_handler(request):
                         panel_manager.mimic_wav[mimic_id].setsampwidth(2)
                         panel_manager.mimic_wav[mimic_id].setframerate(24000) 
 
-                     panel_manager.mimic_wav["mimic_id"].writeframes((np.array(data["payload"]["audio"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
+                     panel_manager.mimic_wav[mimic_id].writeframes((np.array(data["payload"]["audio"]).astype(np.float32) * 32767).astype(np.int16).tobytes())
                  if data["type"] == "user_audio_end":
                     mimic_id = data["payload"]["id"]
                     if mimic_id in panel_manager.mimic_wav:
