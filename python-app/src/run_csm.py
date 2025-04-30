@@ -3,7 +3,6 @@ import torch
 import torchaudio
 from huggingface_hub import hf_hub_download
 from generator import load_csm_1b, Segment
-from dataclasses import dataclass
 
 # Disable Triton compilation
 os.environ["NO_TORCH_COMPILE"] = "1"
@@ -88,7 +87,9 @@ def main():
         # {"text": "Pretty good, pretty good. How about you?", "speaker_id": 1},
         # {"text": "I'm great! So happy to be speaking with you today.", "speaker_id": 0},
         # {"text": "Me too! This is some cool stuff, isn't it?", "speaker_id": 1}
-        {"text": "La-la-la-lava, ch-ch-ch-chicken. Steve's Lava Chicken, yeah, it's tasty as hell. Ooh, mamacita, now you're ringin' the bell. Crispy and juicy, now you're havin' a snack Ooh, super spicy, it's a lava attack", "speaker_id": 1},
+        {"text": "Welcome", "speaker_id": 1},
+        {"text": "To the world's first AI panel!", "speaker_id": 1},
+        {"text": "Where AI debate. Humans watch.", "speaker_id": 1},
     ]
 
     # Generate each utterance
@@ -104,6 +105,11 @@ def main():
             max_audio_length_ms=10_000,
         )
         generated_segments.append(Segment(text=utterance['text'], speaker=utterance['speaker_id'], audio=audio_tensor))
+        torchaudio.save(
+            f"segment{len(generated_segments)}.wav",
+            torch.cat([audio_tensor]).unsqueeze(0).cpu(),
+            generator.sample_rate
+        )
 
     # Concatenate all generations
     all_audio = torch.cat([seg.audio for seg in generated_segments], dim=0)

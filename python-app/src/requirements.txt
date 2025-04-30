@@ -11,3 +11,4 @@ fastapi
 aiohttp
 aiohttp-cors
 numpy==1.26.0
+uagents
