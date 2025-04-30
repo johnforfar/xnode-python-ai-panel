@@ -20,8 +20,9 @@ type WsConnectionStatus =
   | "error";
 
 export default function SpeakerPage() {
-  const speakerId = useMemo(() => {
-    return Math.floor(Math.random() * 1_000_000 + 6);
+  const [speakerId, setSpeakerId] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    setSpeakerId(Math.floor(Math.random() * 1_000_000 + 6));
   }, []);
 
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
