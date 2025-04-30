@@ -169,9 +169,9 @@ export default function SpeakerPage() {
       </div>
 
       {/* Content Container (using flex to position items) */}
-      <div className="relative z-10 flex flex-col h-screen justify-between p-6 md:p-10">
+      <div className="relative z-10 flex flex-col h-screen p-6 md:p-10">
         {/* Top Area: Speaker Name */}
-        <div className="flex-grow flex items-start justify-center pt-10 md:pt-16">
+        <div className="flex items-start justify-center pt-10 md:pt-16">
           {" "}
           {/* Pushes name down slightly */}
           <h1
@@ -183,7 +183,7 @@ export default function SpeakerPage() {
         </div>
 
         {/* Bottom Area: Visualizer */}
-        <div className="flex-shrink-0 h-1/4 flex items-end justify-center pb-5 md:pb-10">
+        <div className="grow h-1/4 flex items-center place-items-center justify-center">
           {" "}
           {/* Pushes visualizer up slightly */}
           {/* Conditionally render the LiveAudioVisualizer */}
