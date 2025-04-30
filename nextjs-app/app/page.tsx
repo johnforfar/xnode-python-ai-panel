@@ -16,14 +16,6 @@ interface ConversationMessage {
   audioUrl?: string | null;
 }
 
-// AI Panel Status Type (Adjust based on backend response)
-interface PanelStatus {
-  status: string;
-  active: boolean;
-  num_agents: number;
-  timestamp: string;
-}
-
 // --- Add type for Backend Test result ---
 interface BackendTestResult {
   ok: boolean;
@@ -66,7 +58,6 @@ export default function Home() {
   const [audioPlayer, setAudioPlayer] = useState<AudioPlayer | undefined>(
     undefined
   );
-  const [panelStatus, setPanelStatus] = useState<PanelStatus | null>(null);
   // --- Add state for backend test ---
   const [backendTest, setBackendTest] = useState<BackendTestResult | null>(
     null
@@ -106,50 +97,8 @@ export default function Home() {
   // --- API Fetching Functions ---
   // These now call the Next.js API routes (the proxy) instead of the Python backend directly
 
-  const fetchStatus = async () => {
-    // Fetch status from our Next.js API route
-    try {
-      const response = await fetch(`/api/panel/status`); // Call the Next.js API route
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Failed to parse error" }));
-        throw new Error(
-          `HTTP error! status: ${response.status} - ${
-            errorData.error || "Unknown status error"
-          }`
-        );
-      }
-      const data: PanelStatus = await response.json();
-      setPanelStatus(data);
-      setError(null); // Clear error on success
-    } catch (err: any) {
-      console.error("Error fetching status:", err);
-      setError(`Failed to fetch status: ${err.message}`);
-    }
-  };
-
-  const fetchInitialConversation = async () => {
-    try {
-      console.log("Fetching initial conversation history...");
-      const response = await fetch(`/api/panel/conversation`);
-      if (!response.ok) {
-        /* ... error handling ... */ return;
-      }
-      const data = await response.json();
-      setConversation(Array.isArray(data.history) ? data.history : []);
-      console.log(
-        `Initial history loaded: ${data.history?.length || 0} messages`
-      );
-      setError(null);
-    } catch (err: any) {
-      console.error("Error fetching initial conversation:", err);
-      setError(`Failed to load history: ${err.message}`);
-    }
-  };
-
   const handleStart = async () => {
-    if (isLoading || panelStatus?.active) return;
+    if (isLoading) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -170,41 +119,9 @@ export default function Home() {
         );
       }
       console.log("Panel start request sent");
-      setTimeout(fetchStatus, 300);
-      setTimeout(fetchInitialConversation, 500);
     } catch (err: any) {
       console.error("Error starting panel:", err);
       setError(`Start failed: ${err.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleStop = async () => {
-    if (isLoading || !panelStatus?.active) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Send stop request to our Next.js API route
-      const response = await fetch(`/api/panel/stop`, {
-        method: "POST",
-        // No body needed for stop typically
-      });
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Failed to parse error" }));
-        throw new Error(
-          `Failed to stop: ${response.status} - ${errorData.error || ""}`
-        );
-      }
-      console.log("Panel stop request sent");
-      // Fetch status and conversation soon after
-      setTimeout(fetchStatus, 300);
-      setTimeout(fetchInitialConversation, 500);
-    } catch (err: any) {
-      console.error("Error stopping panel:", err);
-      setError(`Stop failed: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -278,8 +195,6 @@ export default function Home() {
 
     // Fetch initial data via HTTP first
     fetchBackendTest();
-    fetchStatus();
-    fetchInitialConversation();
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.hostname}:${
@@ -335,47 +250,6 @@ export default function Home() {
               }
               break;
             // --- End ADD ---
-
-            // --- ADD Case for moderator_message (handle like agent_message) ---
-            case "moderator_message":
-              console.log("Handling moderator_message");
-              // Treat moderator message similar to agent message for display
-              setConversation((prev) => [...prev, message.payload]);
-              break;
-            // --- End ADD ---
-
-            case "agent_message":
-              console.log("Handling agent_message");
-              setConversation((prev) => [...prev, message.payload]);
-              break;
-            case "audio_update":
-              setConversation((prev) =>
-                prev.map((msg) =>
-                  msg.timestamp === message.payload.timestamp
-                    ? {
-                        ...msg,
-                        audioStatus: message.payload.audioStatus,
-                        audioUrl: message.payload.audioUrl,
-                      }
-                    : msg
-                )
-              );
-              break;
-            case "status_update":
-              setPanelStatus(message.payload);
-              break;
-            case "system_message":
-              setConversation((prev) => [
-                ...prev,
-                {
-                  agent: "System",
-                  address: "system",
-                  timestamp: new Date().toISOString(),
-                  audioStatus: "failed",
-                  ...message.payload,
-                },
-              ]);
-              break;
             case "audio":
               console.log(
                 `Received audio chunk for ${message.payload.speaker}`
@@ -426,11 +300,6 @@ export default function Home() {
       if (ws.current === socket) {
         console.log("Active WebSocket connection closed.");
         setWsStatus("closed");
-        if (panelStatus?.active) {
-          setPanelStatus((prev) =>
-            prev ? { ...prev, status: "Disconnected", active: false } : null
-          );
-        }
         ws.current = null; // Clear the ref
       } else {
         console.log("Non-active WebSocket instance closed.");
@@ -561,42 +430,16 @@ export default function Home() {
                   WS: {wsStatus}
                 </span>
               </div>
-              <p
-                className={`text-lg font-semibold ${
-                  panelStatus?.active ? "text-green-400" : "text-yellow-400"
-                }`}
-              >
-                Status: {panelStatus?.status ?? "Loading..."}
-              </p>
-              {panelStatus && (
-                <p className="text-xs text-gray-400">
-                  Debaters: {panelStatus.num_agents}
-                </p>
-              )}
             </div>
 
             {/* Controls */}
             <div className="flex items-center gap-4">
               <button
                 onClick={handleStart}
-                disabled={isLoading || panelStatus?.active}
+                disabled={isLoading}
                 className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Start
-              </button>
-              <button
-                onClick={handleStop}
-                disabled={isLoading || !panelStatus?.active}
-                className="px-4 py-2 bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Stop
-              </button>
-              <button
-                onClick={handleClear}
-                disabled={conversation.length === 0} // Disable if already empty
-                className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Clear
               </button>
             </div>
           </div>

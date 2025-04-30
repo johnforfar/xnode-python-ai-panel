@@ -38,7 +38,14 @@ python3Packages.buildPythonApplication {
       python $out/bin/src/app.py
       EOF
 
+      cat > $out/bin/generate-replay << EOF
+      #!/bin/sh
+      source /ai-panel-data/venv/bin/activate
+      python $out/bin/src/replay.py
+      EOF
+
       chmod +x $out/bin/xnode-python-ai-panel-backend
+      chmod +x $out/bin/generate-replay
     '';
 
   # No installPhase needed if buildPhase creates everything in $out

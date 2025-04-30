@@ -18,26 +18,6 @@ async def handle_test(request):
     logger.info("Test endpoint /api/test called successfully.")
     return web.json_response({"status": "ok", "message": "Test successful!"})
 
-async def get_status(request):
-    logger.info("GET /api/status")
-    try:
-        status_data = panel_manager.get_status_data()
-        return web.json_response(status_data)
-    except Exception as e:
-        logger.error(f"Error in get_status handler: {e}", exc_info=True)
-        return web.json_response({"error": "Failed to get status"}, status=500)
-
-async def get_conversation(request):
-    logger.info("GET /api/conversation")
-    try:
-        conv_data = panel_manager.get_conversation_data()
-        logger.info(f"Returning {len(conv_data['history'])} messages")
-        return web.json_response(conv_data)
-    except Exception as e:
-        logger.error(f"Error in get_conversation handler: {e}", exc_info=True)
-        return web.json_response({"error": "Failed to get conversation"}, status=500)
-
-
 async def handle_start(request):
     logger.info("POST /api/start")
     try:
@@ -45,7 +25,7 @@ async def handle_start(request):
             logger.warning("Start requested but panel already active.")
             return web.json_response({"status": "already_active", "message": "Panel is already running."}, status=400)
 
-        success = await panel_manager.start_panel()
+        success = await panel_manager.start_replay()
         if success:
             logger.info("Panel started successfully via API request.")
             return web.json_response({"status": "started", "message": "Panel started successfully."})
@@ -59,26 +39,6 @@ async def handle_start(request):
     except Exception as e:
         logger.error(f"Error in handle_start handler: {e}", exc_info=True)
         return web.json_response({"error": f"Internal server error: {e}"}, status=500)
-
-
-async def handle_stop(request):
-    logger.info("POST /api/stop")
-    try:
-        if not panel_manager.active:
-            logger.warning("Stop requested but panel not active.")
-            return web.json_response({"status": "already_stopped", "message": "Panel is not running."}, status=400)
-
-        success = await panel_manager.stop_panel()
-        if success:
-            logger.info("Panel stopped successfully via API request.")
-            return web.json_response({"status": "stopped", "message": "Panel stopped successfully."})
-        else:
-            logger.error("PanelManager failed to stop.")
-            return web.json_response({"error": "Failed to stop panel"}, status=500)
-    except Exception as e:
-        logger.error(f"Error in handle_stop handler: {e}", exc_info=True)
-        return web.json_response({"error": f"Internal server error: {e}"}, status=500)
-
 
 # --- Application Setup Function ---
 def setup_routes(app):
@@ -98,10 +58,7 @@ def setup_routes(app):
 
     # Add all API routes
     add_route("/api/test", handle_test)
-    add_route("/api/status", get_status)
-    add_route("/api/conversation", get_conversation)
     add_route("/api/start", handle_start, method='POST')
-    add_route("/api/stop", handle_stop, method='POST')
 
     # Add WebSocket Route using the handler IMPORTED from main.py
     add_route("/ws", websocket_handler)

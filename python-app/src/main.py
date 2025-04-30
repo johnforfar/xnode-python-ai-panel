@@ -12,6 +12,7 @@ from uagents import Agent, Bureau, Context, Model as UagentsModel
 import wave
 import numpy as np
 import torch
+from replay import play
 
 # --- Logging Setup (Keep as is) ---
 console_handler = logging.StreamHandler()
@@ -196,8 +197,6 @@ class PanelManager:
     async def add_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Adding WebSocket connection from: {remote_addr or 'Unknown'}")
         self.websockets.add(websocket)
-        await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
-        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
 
     def remove_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Removing WebSocket connection from: {remote_addr or 'Unknown'}")
@@ -339,9 +338,7 @@ class PanelManager:
         }
         self.history.append(message_payload)
 
-        # Determine message type for frontend
-        message_type = "moderator_message" if is_moderator else "agent_message"
-        await self.broadcast_message({"type": message_type, "payload": message_payload})
+        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
 
         # Trigger background audio generation
         if torch.cuda.is_available():
@@ -389,10 +386,13 @@ class PanelManager:
             update_payload = {"timestamp": timestamp, "audioStatus": "failed"}
 
         logger.info(f"Broadcasting audio update for msg [{timestamp}]: {update_payload}")
-        await self.broadcast_message({"type": "audio_update", "payload": update_payload})
+        await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
     # --- End Generate Audio ---
 
     # --- Control Methods (Modified for Bureau) ---
+    async def start_replay(self):
+        await play(self.broadcast_message)
+    
     async def start_panel(self):
         """Starts the uAgents Bureau and conversation."""
         global conversation_active
@@ -424,7 +424,6 @@ class PanelManager:
             "text": f"AI Panel: Crypto's Future. {intro_participants}. (Limit: {self.max_messages} debater responses)",
             "timestamp": datetime.utcnow().isoformat() + "Z", "audioStatus": "failed"
         }]
-        await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
         await self.broadcast_message({"type": "conversation_history", "payload": self.get_conversation_data()})
         # --- End Reset ---
 
@@ -452,7 +451,6 @@ class PanelManager:
         # Kxi agent's startup event *within this new bureau* should now fire correctly
 
         self.status = f"Panel Active ({self.num_agents} debaters)"
-        await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
         logger.info("Panel start sequence complete. New Bureau running asynchronously.")
         return True
 
@@ -470,7 +468,6 @@ class PanelManager:
 
         if original_state_active and self.status != "Stopping Bureau...":
             self.status = "Stopping Bureau..."
-            await self.broadcast_message({"type": "status_update", "payload": self.get_status_data()})
 
         # --- Stop Bureau Task ---
         bureau_stopped = False
