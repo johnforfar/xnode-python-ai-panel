@@ -221,8 +221,10 @@ export default function Home() {
         setWsStatus("open");
         setError(null);
         // Subscribe to all speakers
-        [0, 1, 2, 3, 4].forEach(() =>
-          socket.send(btoa(JSON.stringify({ type: "subscribe", payload: 0 })))
+        [0, 1, 2, 3, 4].forEach((speaker) =>
+          socket.send(
+            btoa(JSON.stringify({ type: "subscribe", payload: speaker }))
+          )
         );
       } else {
         console.warn(

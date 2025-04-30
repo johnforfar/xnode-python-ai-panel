@@ -74,8 +74,10 @@ export default function SpeakerPage() {
       );
       setWsStatus("open");
       // Subscribe to my speaker
-      [parseInt(speakerId) - 1].forEach(() =>
-        socket.send(btoa(JSON.stringify({ type: "subscribe", payload: 0 })))
+      [parseInt(speakerId) - 1].forEach((speaker) =>
+        socket.send(
+          btoa(JSON.stringify({ type: "subscribe", payload: speaker }))
+        )
       );
     };
 
