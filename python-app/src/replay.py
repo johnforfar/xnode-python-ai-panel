@@ -32,7 +32,7 @@ async def play(broadcast_message):
     }]
     await broadcast_message({"type": "conversation_history", "payload": {"history": history}})
     
-    for message, i in enumerate(script):
+    for i, message in enumerate(script):
         audio = f"/audio/replay/{i}.wav"
         history.append({
             "agent": message["speaker"],
@@ -56,7 +56,7 @@ async def broadcast_mock(message):
 
 async def generate():
     tts = TTS()
-    for message, i in enumerate(script):
+    for i, message in enumerate(script):
          tts.generate_audio(message["line"], speaker_id[message["speaker"]], broadcast_mock, False)
          os.rename(f"{data_dir}/static/audio/{i+1}.wav", f"{data_dir}/static/audio/replay/{i}.wav")
          print(f"Generated replay message {i+1}/{len(script)}")

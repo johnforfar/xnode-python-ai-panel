@@ -40,6 +40,7 @@ python3Packages.buildPythonApplication {
 
       cat > $out/bin/generate-replay << EOF
       #!/bin/sh
+      export DATADIR=/ai-panel-data
       source /ai-panel-data/venv/bin/activate
       python $out/bin/src/replay.py
       EOF
