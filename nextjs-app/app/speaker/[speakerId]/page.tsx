@@ -73,6 +73,10 @@ export default function SpeakerPage() {
         `SpeakerPage [${speakerId}]: WebSocket connection established`
       );
       setWsStatus("open");
+      // Subscribe to my speaker
+      [parseInt(speakerId) - 1].forEach(() =>
+        socket.send(btoa(JSON.stringify({ type: "subscribe", payload: 0 })))
+      );
     };
 
     socket.onmessage = (event) => {
@@ -82,12 +86,10 @@ export default function SpeakerPage() {
         // Listen for activity (speaker_activity or audio_update)
         switch (message.type) {
           case "audio":
-            if (message.payload.speaker === parseInt(speakerId) - 1) {
-              audioPlayer.queueFragment(
-                message.payload.playAt,
-                message.payload.chunk
-              );
-            }
+            audioPlayer.queueFragment(
+              message.payload.playAt,
+              message.payload.chunk
+            );
         }
       } catch (e) {
         console.error(
@@ -144,7 +146,11 @@ export default function SpeakerPage() {
 
   return (
     // Use a relative container for absolute positioning of overlays
-    <main className={`relative min-h-screen w-full font-sans overflow-hidden text-white speaker-background ${isPlaying ? "speaking" : ""}`}>
+    <main
+      className={`relative min-h-screen w-full font-sans overflow-hidden text-white speaker-background ${
+        isPlaying ? "speaking" : ""
+      }`}
+    >
       {/* Background Image - REMOVED */}
       {/*
       <Image

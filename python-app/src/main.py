@@ -157,7 +157,7 @@ class PanelManager:
         self.active = False
         self.history = []
         self.num_agents = len(DEBATER_AGENTS) # Number of debaters
-        self.websockets = set()
+        self.websockets = []
         self.bureau_task = None # Task handle for Bureau
         self.bureau = None      # Initialize Bureau as None here
 
@@ -196,20 +196,21 @@ class PanelManager:
     # --- WebSocket Methods (unchanged) ---
     async def add_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Adding WebSocket connection from: {remote_addr or 'Unknown'}")
-        self.websockets.add(websocket)
+        self.websockets.append({"socket": websocket, "events": []})
 
     def remove_websocket(self, websocket, remote_addr: str | None):
         logger.info(f"Removing WebSocket connection from: {remote_addr or 'Unknown'}")
-        self.websockets.discard(websocket)
+        self.websockets = [x for x in self.websockets if x["socket"] != websocket]
 
     async def broadcast_message(self, message_data: dict, exclude_sender=None):
         """Sends a JSON message to all connected WebSocket clients, optionally excluding one."""
-        if not self.websockets:
+        if len(self.websockets) == 0:
             # logger.info("Broadcast: No active WebSocket clients.") # Can be noisy
             return
 
+        type = message_data["type"]
         # Logging audio fragments is very intense
-        if message_data["type"] != "audio":
+        if type != "audio":
             logger.info(f"Broadcasting message to {len(self.websockets)} clients (excluding sender: {exclude_sender is not None}): {message_data}")
             
         message_json = base64.b64encode(bytes(json.dumps(message_data), "utf-8")).decode('ascii')
@@ -217,11 +218,12 @@ class PanelManager:
         closed_sockets = []
 
         for ws in self.websockets:
-            if ws == exclude_sender: continue # Skip the excluded sender
-            if not ws.closed:
-                tasks.append(ws.send_str(message_json))
+            if ws["socket"] == exclude_sender: continue # Skip the excluded sender
+            if not ws["socket"].closed:
+                if type != "audio" or message_data["payload"]["speaker"] in ws["events"]: # Only send audio event to clients subscribed to that speaker
+                    tasks.append(ws.send_str(message_json))
             else:
-                closed_sockets.append(ws) # Collect closed sockets for removal later
+                closed_sockets.append(ws["socket"]) # Collect closed sockets for removal later
 
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -644,6 +646,9 @@ async def websocket_handler(request):
                  data = json.loads(base64.b64decode(bytes(msg.data, "ascii")).decode("utf-8"))
                  logger.info(f"WS_HANDLER [{remote_addr}]: Received TEXT message: {data["type"]}")
                  # Optional: Handle commands sent FROM frontend via WS if needed later
+                 if data["type"] == "subscribe":
+                     for socket in [x for x in panel_manager.websockets if x["socket"] == ws]:
+                         socket["events"].append(data["payload"])
                  if data["type"] == "user_audio":
                      if not panel_manager.mimic_wav:
                         panel_manager.mimic_wav = wave.open(f"{data_dir()}/voices/mimic.wav", 'wb')

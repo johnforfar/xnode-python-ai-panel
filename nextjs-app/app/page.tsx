@@ -220,6 +220,10 @@ export default function Home() {
         console.log("WebSocket connection established (onopen, ref matches)");
         setWsStatus("open");
         setError(null);
+        // Subscribe to all speakers
+        [0, 1, 2, 3, 4].forEach(() =>
+          socket.send(btoa(JSON.stringify({ type: "subscribe", payload: 0 })))
+        );
       } else {
         console.warn(
           "WebSocket opened, but ws.current points to a different instance. Closing this orphaned socket."
