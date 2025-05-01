@@ -6,6 +6,16 @@ import Image from "next/image";
 import { LiveAudioVisualizer } from "react-audio-visualize"; // Re-added import
 import { AudioPlayer } from "@/lib/audioplayer";
 
+// --- ADDED: Name mapping for display ---
+const displayNameMap: { [key: string]: string } = {
+  TheDon: "Tronald Pump",
+  PeterGoldBug: "Bitter Schiff",
+  RealSatoshi: "Satoshi Mammoto",
+  MrLightning: "Mickey Sailer",
+  // CryptoKitty maps to itself implicitly
+};
+// --- END ADDED MAPPING ---
+
 // Define speaker data mapping - UPDATED based on user request and backend names
 const speakerData: { [key: string]: { name: string; image: string } } = {
   "1": { name: "CryptoKitty", image: "/1.jpg" }, // Moderator (previously named Kxi)
@@ -44,7 +54,13 @@ export default function SpeakerPage() {
   // Set speaker info based on ID
   useEffect(() => {
     if (speakerId && speakerData[speakerId]) {
-      setSpeakerInfo(speakerData[speakerId]);
+      // --- Use displayNameMap ---
+      const originalInfo = speakerData[speakerId];
+      setSpeakerInfo({
+        ...originalInfo, // Keep image etc.
+        name: displayNameMap[originalInfo.name] || originalInfo.name, // Apply mapping
+      });
+      // --- End Use ---
     } else {
       // Handle invalid/missing speaker ID
       setSpeakerInfo({ name: "Unknown", image: "/default.jpg" }); // Provide a fallback image

@@ -31,6 +31,16 @@ type WsConnectionStatus =
   | "closed"
   | "error";
 
+// --- ADDED: Name mapping for display ---
+const displayNameMap: { [key: string]: string } = {
+  TheDon: "Tronald Pump",
+  PeterGoldBug: "Bitter Schiff",
+  RealSatoshi: "Satoshi Mammoto",
+  MrLightning: "Mickey Sailer",
+  // CryptoKitty maps to itself implicitly
+};
+// --- END ADDED MAPPING ---
+
 // Define speaker data mapping - including inspiration
 const speakerPanelData: {
   [key: string]: {
@@ -478,19 +488,29 @@ export default function Home() {
 
           {/* --- ADDED: Second Row: Speaker Buttons --- */}
           <div className="flex flex-wrap justify-center items-center gap-3 mt-2 border-t border-[#454545] pt-4">
-            <button
+             {/* Open All Button */}
+             <button
               onClick={() => {
                 Object.values(speakerPanelData).forEach((speaker, i) => {
                   window.open(
                     `${window.location.href}/speaker/${speaker.id}`,
-                    speaker.name,
+                    displayNameMap[speaker.name] || speaker.name, // Use mapped name for window title too
                     `left=${384 * i},width=384,height=1080`
                   );
                 });
+                // Open centerscreen (no name change needed here for the window itself)
+                 window.open(
+                  `${window.location.href}/centerscreen`,
+                  `centerscreen`,
+                  `left=${384 * Object.keys(speakerPanelData).length},width=800,height=1080`
+                );
               }}
+              className="px-4 py-2 bg-purple-600 rounded hover:bg-purple-700 transition-colors whitespace-nowrap text-sm font-medium" // Restored styling
             >
               Open All
             </button>
+
+            {/* Speaker Buttons */}
             {Object.values(speakerPanelData).map((speaker) => (
               <Link
                 key={speaker.id}
@@ -503,7 +523,8 @@ export default function Home() {
                   rel="noopener noreferrer" // Security best practice
                   className="px-3 py-1.5 text-sm bg-blue-600 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
                 >
-                  {speaker.id} - {speaker.name} ({speaker.inspiration})
+                  {/* --- Use displayNameMap for button text --- */}
+                  {speaker.id} - {displayNameMap[speaker.name] || speaker.name} ({speaker.inspiration})
                 </a>
               </Link>
             ))}

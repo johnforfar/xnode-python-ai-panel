@@ -4,6 +4,16 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
+// --- ADDED: Name mapping for display ---
+const displayNameMap: { [key: string]: string } = {
+  TheDon: "Tronald Pump",
+  PeterGoldBug: "Bitter Schiff",
+  RealSatoshi: "Satoshi Mammoto",
+  MrLightning: "Mickey Sailer",
+  // CryptoKitty maps to itself implicitly
+};
+// --- END ADDED MAPPING ---
+
 // Define speaker data mapping - MUST MATCH BACKEND (e.g., python-app/src/replay.py speaker_id map)
 const speakerIdToName: { [key: number]: string } = {
   0: "CryptoKitty", // Moderator
@@ -130,8 +140,10 @@ export default function CenterScreenPage() {
       );
       if (latestIndex > 0) {
         const latestItem = historyLog.at(latestIndex - 1);
+        const originalAgentName = latestItem?.agent ?? "";
+        const displayAgentName = displayNameMap[originalAgentName] || originalAgentName;
         setCurrentText(latestItem?.text ?? "");
-        setCurrentSpeaker(latestItem?.agent ?? "");
+        setCurrentSpeaker(displayAgentName);
       }
     }, 10);
 
