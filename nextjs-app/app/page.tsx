@@ -478,7 +478,7 @@ export default function Home() {
             <div className="flex items-center gap-4">
               <button
                 onClick={handleStart}
-                disabled={isLoading}
+                disabled={true}
                 className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Start
@@ -488,8 +488,8 @@ export default function Home() {
 
           {/* --- ADDED: Second Row: Speaker Buttons --- */}
           <div className="flex flex-wrap justify-center items-center gap-3 mt-2 border-t border-[#454545] pt-4">
-             {/* Open All Button */}
-             <button
+            {/* Open All Button */}
+            <button
               onClick={() => {
                 Object.values(speakerPanelData).forEach((speaker, i) => {
                   window.open(
@@ -499,10 +499,12 @@ export default function Home() {
                   );
                 });
                 // Open centerscreen (no name change needed here for the window itself)
-                 window.open(
+                window.open(
                   `${window.location.href}/centerscreen`,
                   `centerscreen`,
-                  `left=${384 * Object.keys(speakerPanelData).length},width=800,height=1080`
+                  `left=${
+                    384 * Object.keys(speakerPanelData).length
+                  },width=800,height=1080`
                 );
               }}
               className="px-4 py-2 bg-purple-600 rounded hover:bg-purple-700 transition-colors whitespace-nowrap text-sm font-medium" // Restored styling
@@ -524,7 +526,8 @@ export default function Home() {
                   className="px-3 py-1.5 text-sm bg-blue-600 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
                 >
                   {/* --- Use displayNameMap for button text --- */}
-                  {speaker.id} - {displayNameMap[speaker.name] || speaker.name} ({speaker.inspiration})
+                  {speaker.id} - {displayNameMap[speaker.name] || speaker.name}{" "}
+                  ({speaker.inspiration})
                 </a>
               </Link>
             ))}
@@ -545,13 +548,8 @@ export default function Home() {
               </a>
             </Link>
 
-             {/* --- Mimic Button (Pink) --- */}
-             <Link
-              key="mimic"
-              href="/mimic"
-              passHref
-              legacyBehavior
-            >
+            {/* --- Mimic Button (Pink) --- */}
+            <Link key="mimic" href="/mimic" passHref legacyBehavior>
               <a
                 target="_blank"
                 rel="noopener noreferrer"
@@ -560,7 +558,7 @@ export default function Home() {
                 Mimic
               </a>
             </Link>
-          {/* --- End Speaker Buttons Row --- */}
+            {/* --- End Speaker Buttons Row --- */}
           </div>
 
           {/* Error Display */}
