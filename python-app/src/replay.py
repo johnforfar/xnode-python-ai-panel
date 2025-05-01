@@ -21,7 +21,13 @@ script = [
     {"speaker": "Kxi", "line": " And that concludes our very revealing 'Fun Segment'! Back to you Ashton!"},
 ]
 
-speaker_id = {"Kxi": 0, "Kai": 1, "Liq": 2, "Vivi": 3, "Nn": 4}
+speaker_id = {
+    "Kxi": 0, # Moderator
+    "Kai": 1, # Peter Schiff
+    "Liq": 2, # Michael Saylor
+    "Vivi": 3, # Satoshi Nakamoto
+    "Nn": 4 # Donald Trump
+}
 
 async def play(broadcast_message):
     playAt = int(time.time()) + 10
