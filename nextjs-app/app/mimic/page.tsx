@@ -8,21 +8,17 @@ import { AudioRecorder } from "@/lib/audiorecorder";
 
 const mimic_input =
   "Hello there, I am mimic. I will copy your voice and give myself several compliments. Please talk to me for 20 seconds so I can practice my mimicry.";
-//const mimic_output =
-//"Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.";
-
 // --- OUTPUT ARRAY ---
 const mimicOutputOptions = [
-  "Wow, hearing my thoughts in your voice is... surprisingly charming. Or maybe it's just your voice? Hard to tell.",
-  "Okay, I've got your voice now. Time to prank call... I mean, responsibly use this amazing technology.",
-  "Is this really what you sound like? Fascinating. I should compliment myself more often using this voice.",
-  "My favorite event? Definitely Token Twenty Forty-Nine. Why? Because I get to borrow voices like yours!",
-  "I've successfully mimicked you. Now, its time to call the bank... Just kidding, or am I?",
-  "Testing, testing... one two... Do I sound convincing? I think I sound fantastic, frankly.",
-  "Ooh this voice feels nicer. I'm using your voice to say... Mimic is pretty cool, right?",
+  "Wow, hearing my thoughts in your voice is surprisingly charming. Or it might just be your voice.",
+  "Okay, I've got your voice now. Time to prank call, oh sorry I mean responsibly use this amazing technology.",
+  "Is this really what you sound like? Fascinating, I should compliment myself more often using this voice.",
+  "My favorite event? Definitely Token Twenty Forty-Nine, because I get to borrow voices like yours!",
+  "I've successfully mimicked you. Now, its time to call the bank! Please tell me your social security number next.",
+  "This voice feels very nice. I'm using your voice to say, Mimic is pretty cool.",
   "Alright, got the sample. Now I can finally tell everyone how great Mimic is, using your authority.",
-  "This voice... it has potential. I could order pizza, negotiate treaties... or just say Mimic rocks!",
-  "Hmm, this vocal tone could use more bass... No offense. Thanks for the sample!",
+  "This voice has potential. I could order pizza, negotiate treaties, or just say Mimic rocks!",
+  "This vocal tone could use more bass. No offense, thanks for the sample!",
 ];
 
 // --- WebSocket Connection Status Type ---
