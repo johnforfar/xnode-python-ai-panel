@@ -104,7 +104,7 @@ class TTS:
             text=re.sub(r'\.\.\.| - |; |: |---', ', ', re.sub(r'["*]', '', text)), # Remove/replace some characters as they mess up the speech
             speaker=speaker_id,
             # Only add this speakers prompt to context
-            context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + extraContext,
+            context=next(([item] for item in self.prompt_segments if item.speaker == speaker_id), []) + next(([item] for item in reversed(self.generated_segments) if item.speaker == speaker_id), []) + extraContext,
             max_audio_length_ms=30_000,
         ):
             chunk = audio_chunk.cpu().numpy().astype(np.float32).tolist()
@@ -112,6 +112,10 @@ class TTS:
             audio_chunks.append(audio_chunk)
 
         if not mimic:
+            if len(audio_chunks) * 20 * 0.08 == 30_000:
+                # Max duration, probably a bug, regenerate
+                return self.generate_audio(text, speaker_id, broadcast_message, usePlayAt, extraContext)
+
             audio_tensor = torch.cat(audio_chunks)
             self.generated_segments.append(Segment(text=text, speaker=speaker_id, audio=audio_tensor))
 
