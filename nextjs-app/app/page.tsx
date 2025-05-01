@@ -507,8 +507,40 @@ export default function Home() {
                 </a>
               </Link>
             ))}
-          </div>
+
+            {/* --- Center Screen Button (Orange) --- */}
+            <Link
+              key="centerscreen"
+              href="/centerscreen"
+              passHref
+              legacyBehavior
+            >
+              <a
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-sm bg-orange-600 rounded hover:bg-orange-700 transition-colors whitespace-nowrap" // Orange color
+              >
+                Center Screen
+              </a>
+            </Link>
+
+             {/* --- Mimic Button (Pink) --- */}
+             <Link
+              key="mimic"
+              href="/mimic"
+              passHref
+              legacyBehavior
+            >
+              <a
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-sm bg-pink-600 rounded hover:bg-pink-700 transition-colors whitespace-nowrap" // Pink color
+              >
+                Mimic
+              </a>
+            </Link>
           {/* --- End Speaker Buttons Row --- */}
+          </div>
 
           {/* Error Display */}
           {error && (
