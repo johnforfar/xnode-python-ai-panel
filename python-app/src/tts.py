@@ -112,7 +112,7 @@ class TTS:
             audio_chunks.append(audio_chunk)
 
         if not mimic:
-            if len(audio_chunks) * 20 * 0.08 == 30_000:
+            if (len(audio_chunks) * 20 * 0.08) > 20:
                 # Long duration, probably a bug, regenerate
                 return self.generate_audio(text, speaker_id, broadcast_message, usePlayAt, extraContext)
 

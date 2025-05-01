@@ -92,13 +92,14 @@ async def play(broadcast_message):
             "audioStatus": "ready",
             "audioUrl": audio,
         })
-
         
         await broadcast_message({"type": "conversation_history", "payload": {"history": history}})
         audio_data, sample_rate = torchaudio.load(f"{data_dir()}/static{audio}")
         chunk = audio_data.squeeze(0).numpy().astype(np.float32).tolist()
         await broadcast_message({"type": "audio", "payload": {"speaker": speaker_id[message["speaker"]], "playAt": playAt, "chunk": chunk}})
-        playAt += (len(chunk) / 24000) + 0.5
+
+        delay = 0.5 if i == 0 or history[i - 1]["agent"] == message["speaker"] else 1.5
+        playAt += (len(chunk) / 24000) + delay
 
 async def broadcast_mock(message):
      return
