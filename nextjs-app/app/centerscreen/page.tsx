@@ -155,8 +155,9 @@ export default function CenterScreenPage() {
       );
       setWsStatus("closed");
       ws.current = null;
-       if (event.code !== 1000) { // Don't show error on clean close
-           setCurrentText("WebSocket disconnected.");
+       if (event.code !== 1000) { // Don't show specific disconnect message on abnormal close
+           console.warn(`WebSocket closed abnormally (code: ${event.code}), setting text to 'Panel ended'.`);
+           setCurrentText("Panel ended."); // Set to "Panel ended." on abnormal close too
        } else {
             setCurrentText("Panel ended."); // Assume clean close means panel ended
        }
@@ -201,11 +202,25 @@ export default function CenterScreenPage() {
 
       {/* Content Container - Centering the text */}
       <div className="relative z-10 flex flex-col items-center justify-center h-screen p-6 text-center">
-        {/* Use a key based on the text to force re-render for animation */}
+
+        {/* Speaker Name Display (conditional) */}
+        {currentSpeakerName && (
+           <h2
+             // Use a key to potentially help with transitions if needed later
+             key={`${currentSpeakerName}-name`}
+             className="text-xl md:text-2xl lg:text-3xl font-medium mb-4 text-gray-300 animate-fade-in" // Smaller size, lighter color, margin bottom
+             style={{ textShadow: "1px 1px 4px rgba(0,0,0,0.6)" }}
+           >
+              {currentSpeakerName} says:
+           </h2>
+        )}
+
+        {/* Main Text Display (Smaller) */}
         <p
           key={currentText} // Force re-render on text change for animation trigger
-          className="text-4xl md:text-6xl lg:text-7xl font-semibold animate-fade-in" // Added simple fade-in
-          style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.8)" }} // Slightly stronger shadow
+          // CHANGED: Reduced font sizes
+          className="text-2xl md:text-3xl lg:text-4xl font-semibold animate-fade-in"
+          style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.8)" }}
         >
           {currentText}
         </p>

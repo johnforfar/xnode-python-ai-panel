@@ -8,25 +8,28 @@ import numpy as np
 import asyncio
 
 script = [
-    {"speaker": "Kxi", "line": "Alright folks, let's pause the high-stakes debate for a quick 'Fun Segment'! We asked our panelists for their secret crypto confessions."},
-    {"speaker": "Kai", "line": "I once almost bought a Bitcoin back in 2011. Decided gold was safer and I still think I was right."},
-    {"speaker": "Liq", "line": "Oh, Kai, still polishing those pet rocks? I tried explaining Bitcoin to my cat. He just stared blankly, clearly he works for the fiat system."},
-    {"speaker": "Vivi", "line": "I designed Bitcoin, but I still sometimes forget my private keys. Last week I had to reset my hardware wallet password."},
-    {"speaker": "Nn", "line": "I told everyone I invented Bitcoin. Tremendous idea, everyone believed me, except the stupid people."},
-    {"speaker": "Kxi", "line": "On to the next topic! If Bitcoin hit 1 million dollars tomorrow, what would you do?"},
-    {"speaker": "Kai", "line": "Buy more gold, obviously! Maybe a slightly bigger vault."},
-    {"speaker": "Liq", "line": "He'd secretly buy Bitcoin and pretend it was gold-plated! Don't try to deny it Kai."},
-    {"speaker": "Vivi", "line": "Logically at $1 million volatility might decrease, making it a more stable asset layer. I would be very interested to see how the market will change."},
-    {"speaker": "Nn", "line": "I'm not selling until it hits ten million. Folks, mark my words, I'll build a huge beautiful Bitcoin tower!"},
-    {"speaker": "Kxi", "line": " And that concludes our very revealing 'Fun Segment'! Back to you Ashton!"},
+    {"order": "01", "speaker": "CryptoKitty", "line": "Alright, panel, welcome to the AI Panel. First question: what’s the messiest crypto confession you’re willing to admit? No PR spin—hit us with it."},
+    {"order": "02", "speaker": "PeterGoldBug", "line": "Back in 2011, I almost bought Bitcoin. Nearly fell for the hype like a damn fool. Then I snapped out of it, stuck with gold, the real deal, while you crypto freaks jerk off to crashing charts."},
+    {"order": "03", "speaker": "MrLightning", "line": "Peter, you fossil, still humping that gold bar? I sold my soul to Bitcoin—maxed every line of credit. Darkest secret? I’d do it again, even if it tanks, while you polish relics and miss the future."},
+    {"order": "04", "speaker": "PeterGoldBug", "line": "You sanctimonious prick, Bitcoin’s a scam—tulips on crack. I’d rather bury gold in my backyard than touch your digital monopoly money. You’re no visionary, just a bagholder with a podcast."},
+    {"order": "05", "speaker": "MrLightning", "line": "Adorable, Peter, like a caveman yelling at fire. Bitcoin’s eating your lunch, and I laugh at your tweets while stacking sats. Cry harder."},
+    {"order": "06", "speaker": "RealSatoshi", "line": "I built Bitcoin to screw over banks, but here’s the kicker: lost half my stash to a dead hard drive in 2010. Genius move, right? Still beats trusting some suit."},
+    {"order": "07", "speaker": "TheDon", "line": "Bitcoin? I made it happen—best idea ever, folks. Secret? I told everyone it’s huge, massive potential, and they ate it up. Don’t own any—don’t need to. I’m the brand, baby."},
+    {"order": "08", "speaker": "CryptoKitty", "line": "Alright, you animals, next question: if Bitcoin hits a million bucks tomorrow, what’s your move? Go."},
+    {"order": "09", "speaker": "PeterGoldBug", "line": "I’d buy gold, obviously—maybe a bigger safe to watch you idiots crash when the bubble pops. Bitcoin at a million? Still a scam, just with fancier zeros."},
+    {"order": "10", "speaker": "MrLightning", "line": "Peter, you’d secretly buy Bitcoin and brag about it—don’t front. I’d leverage every dime, build a Bitcoin empire, and laugh as your gold turns into doorstops. Million’s just the start, peasant."},
+    {"order": "11", "speaker": "RealSatoshi", "line": "I’d cash out a chunk—quietly. Fix some mistakes, maybe fund something new. Bitcoin’s not about me anymore; it’s yours to screw up."},
+    {"order": "12", "speaker": "TheDon", "line": "I’d make it the official U.S. currency—tremendous, the best. Everyone’s saying, ‘Sir, you’re a genius,’ and they’re right. Gold? Old news. Bitcoin’s the new money now."},
+    {"order": "13", "speaker": "CryptoKitty", "line": "And that’s where we cut it. AI Panel’s over—thanks for the chaos. Back to you, Ashton."},
 ]
 
+
 speaker_id = {
-    "Kxi": 0, # Moderator
-    "Kai": 1, # Peter Schiff
-    "Liq": 2, # Michael Saylor
-    "Vivi": 3, # Satoshi Nakamoto
-    "Nn": 4 # Donald Trump
+    "CryptoKitty": 0,    # Moderator (previously named Kxi)
+    "PeterGoldBug": 1,   # Peter Schiff (previously named Kai)
+    "MrLightning": 2,    # Michael Saylor (previously named Liq)
+    "RealSatoshi": 3,    # Satoshi Nakamoto (previously named Vivi)
+    "TheDon": 4          # Donald Trump (previously named Nn)
 }
 
 async def play(broadcast_message):
