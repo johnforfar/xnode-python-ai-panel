@@ -40,10 +40,8 @@ export default function CenterScreenPage() {
   const [currentText, setCurrentText] = useState<string>(
     "Waiting for conversation..."
   );
-  const [currentSpeakerName, setCurrentSpeakerName] = useState<string | null>(
-    null
-  ); // Track speaker
   const [historyLog, setHistoryLog] = useState<HistoryMessage[]>([]); // Store history
+  const [currentSpeaker, setCurrentSpeaker] = useState<string>("");
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
   const ws = useRef<WebSocket | null>(null);
 
@@ -63,15 +61,6 @@ export default function CenterScreenPage() {
     socket.onopen = () => {
       console.log(`CenterScreen: WebSocket connection established`);
       setWsStatus("open");
-      // Subscribe to all speakers - necessary if backend filters non-subscribed audio
-      // Even though we don't play audio here, receiving the 'audio' message
-      // for the speaker is our trigger to display their text.
-      Object.keys(speakerIdToName).forEach((id) => {
-        socket.send(
-          btoa(JSON.stringify({ type: "subscribe", payload: parseInt(id) }))
-        );
-        console.log(`CenterScreen: Subscribed to speaker ${id}`);
-      });
       setInterval(() => {
         // Keep alive heartbeat
         if (socket.readyState === WebSocket.OPEN) {
@@ -91,62 +80,6 @@ export default function CenterScreenPage() {
         ) {
           const newHistory: HistoryMessage[] = message.payload.history;
           setHistoryLog(newHistory); // Update the stored history log
-
-          // Update text based on latest history entry initially, only if no speaker is active
-          if (!currentSpeakerName) {
-            const latestMessage = newHistory
-              .slice()
-              .reverse()
-              .find((msg) => msg.agent !== "System");
-
-            if (latestMessage && latestMessage.text) {
-              if (latestMessage.text !== currentText) {
-                setCurrentText(latestMessage.text);
-                // Don't set currentSpeakerName from history directly, wait for audio trigger
-              }
-            } else if (newHistory.length <= 1) {
-              setCurrentText("Waiting for conversation...");
-              setCurrentSpeakerName(null);
-            }
-          }
-        } else if (message.type === "audio") {
-          // Update text based on the speaker whose audio chunk arrived
-          const speakerId: number | undefined = message.payload?.speaker;
-
-          if (speakerId !== undefined && historyLog.length > 0) {
-            const speakerName = speakerIdToName[speakerId];
-            if (speakerName) {
-              // Find the latest message from this specific speaker in our stored history
-              const speakerLastMessage = historyLog
-                .slice()
-                .reverse()
-                .find((msg) => msg.agent === speakerName);
-
-              if (speakerLastMessage && speakerLastMessage.text) {
-                // Update text only if it's different or speaker changes
-                if (
-                  speakerLastMessage.text !== currentText ||
-                  speakerName !== currentSpeakerName
-                ) {
-                  setCurrentText(speakerLastMessage.text);
-                  setCurrentSpeakerName(speakerName); // Track current speaker
-                  console.log(
-                    `CenterScreen: Displaying text for speaker: ${speakerName}`
-                  );
-                }
-              }
-            } else {
-              console.warn(
-                `CenterScreen: Received audio chunk for unknown speaker ID: ${speakerId}`
-              );
-            }
-          }
-        } else if (message.type === "status_update") {
-          // Optional: Handle panel stop status
-          if (message.payload?.active === false && wsStatus !== "closed") {
-            setCurrentText("Panel ended.");
-            setCurrentSpeakerName(null);
-          }
         }
       } catch (e) {
         console.error(
@@ -161,7 +94,6 @@ export default function CenterScreenPage() {
       console.error(`CenterScreen: WebSocket error:`, event);
       setWsStatus("error");
       setCurrentText("WebSocket connection error.");
-      setCurrentSpeakerName(null);
     };
 
     socket.onclose = (event) => {
@@ -179,7 +111,6 @@ export default function CenterScreenPage() {
       } else {
         setCurrentText("Panel ended."); // Assume clean close means panel ended
       }
-      setCurrentSpeakerName(null);
       setHistoryLog([]); // Clear history on close
     };
 
@@ -194,12 +125,25 @@ export default function CenterScreenPage() {
     };
   }, []); // Empty dependency array means this runs once on mount
 
+  useEffect(() => {
+    // Find latest message after current timestamp
+    const timer = setInterval(() => {
+      const latestItem = historyLog.find(
+        (m) => new Date(m.timestamp).getTime() > new Date().getTime()
+      );
+      setCurrentText(latestItem?.text ?? "");
+      setCurrentSpeaker(latestItem?.agent ?? "");
+    }, 10);
+
+    return () => clearInterval(timer);
+  }, [historyLog]);
+
   return (
     // Using a key on main to potentially force re-render on critical state changes if needed,
     // but key on <p> tag is usually sufficient for text animation.
     <main
       className={`relative min-h-screen w-full overflow-hidden text-white centerscreen-background ${
-        currentSpeakerName ? "speaking" : "" // Use 'speaking' class when someone is talking
+        currentText ? "speaking" : "" // Use 'speaking' class when someone is talking
       }`}
     >
       {/* Background Image - REMOVED */}
@@ -221,20 +165,20 @@ export default function CenterScreenPage() {
       {/* Status Indicator (Optional but helpful for debugging) */}
       <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
         <span>WS: {wsStatus}</span>
-        {currentSpeakerName && <span>Speaker: {currentSpeakerName}</span>}
+        {currentSpeaker && <span>Speaker: {currentSpeaker}</span>}
       </div>
 
       {/* Content Container - Centering the text */}
       <div className="relative z-10 flex flex-col items-center justify-center h-screen p-6 text-center">
         {/* Speaker Name Display (conditional) */}
-        {currentSpeakerName && (
+        {currentSpeaker && (
           <h2
             // Use a key to potentially help with transitions if needed later
-            key={`${currentSpeakerName}-name`}
+            key={`${currentSpeaker}-name`}
             className="text-xl md:text-2xl lg:text-3xl font-medium mb-4 text-gray-100 animate-fade-in" // Adjusted color slightly for contrast
             style={{ textShadow: "1px 1px 4px rgba(0,0,0,0.7)" }} // Increased shadow slightly
           >
-            {currentSpeakerName} says:
+            {currentSpeaker} says:
           </h2>
         )}
 
