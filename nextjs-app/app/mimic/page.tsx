@@ -7,7 +7,7 @@ import { Mic, Square } from "lucide-react";
 import { AudioRecorder } from "@/lib/audiorecorder";
 
 const mimic_input =
-  "Hello there, I am mimic. I will copy your voice and give myself several compliments. Please talk to me for 20 seconds so I can practice my mimicry.";
+  "Hello there, I am OpenxAI Mimic. I will copy your voice and give myself several compliments. Please talk to me for 20 seconds so I can practice my mimicry.";
 // --- OUTPUT ARRAY ---
 const mimicOutputOptions = [
   "Wow, hearing my thoughts in your voice is surprisingly charming. Or it might just be your voice.",
@@ -283,13 +283,13 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes name down slightly */}
           <h1
-            className="text-7xl md:text-9xl font-bold whitespace-normal break-words text-center"
+            className="text-7xl md:text-6xl font-bold whitespace-normal break-words text-center"
             style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }} // Add shadow for readability
           >
-            Mimic
+            OpenxAI Mimic
           </h1>
         </div>
-        <div className="grow text-5xl flex place-items-center place-content-center">
+        <div className="grow text-4xl flex place-items-center place-content-center">
           <span>{mimic_input}</span>
         </div>
         <div className="flex place-content-center">
