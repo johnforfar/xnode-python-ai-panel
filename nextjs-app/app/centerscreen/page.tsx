@@ -197,8 +197,13 @@ export default function CenterScreenPage() {
   return (
     // Using a key on main to potentially force re-render on critical state changes if needed,
     // but key on <p> tag is usually sufficient for text animation.
-    <main className="relative min-h-screen w-full overflow-hidden text-white">
-      {/* Background Image */}
+    <main
+      className={`relative min-h-screen w-full overflow-hidden text-white centerscreen-background ${
+        currentSpeakerName ? "speaking" : "" // Use 'speaking' class when someone is talking
+      }`}
+    >
+      {/* Background Image - REMOVED */}
+      {/*
       <Image
         src="/1.jpg" // Assuming 1.jpg is in the public folder
         alt="Background"
@@ -208,9 +213,10 @@ export default function CenterScreenPage() {
         unoptimized // Useful if the image is served locally
         className="-z-10" // Place the image behind other content
       />
+      */}
 
-      {/* Optional: Dark Scrim for Text Readability */}
-      <div className="absolute inset-0 bg-black/40 -z-10"></div>
+      {/* Optional: Dark Scrim for Text Readability - REMOVED (Adjust if needed over gradient) */}
+      {/* <div className="absolute inset-0 bg-black/40 -z-10"></div> */}
 
       {/* Status Indicator (Optional but helpful for debugging) */}
       <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
@@ -225,8 +231,8 @@ export default function CenterScreenPage() {
           <h2
             // Use a key to potentially help with transitions if needed later
             key={`${currentSpeakerName}-name`}
-            className="text-xl md:text-2xl lg:text-3xl font-medium mb-4 text-gray-300 animate-fade-in" // Smaller size, lighter color, margin bottom
-            style={{ textShadow: "1px 1px 4px rgba(0,0,0,0.6)" }}
+            className="text-xl md:text-2xl lg:text-3xl font-medium mb-4 text-gray-100 animate-fade-in" // Adjusted color slightly for contrast
+            style={{ textShadow: "1px 1px 4px rgba(0,0,0,0.7)" }} // Increased shadow slightly
           >
             {currentSpeakerName} says:
           </h2>

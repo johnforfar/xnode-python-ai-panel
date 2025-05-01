@@ -179,3 +179,108 @@ main.speaker-background.speaking {
 .status-indicator span {
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
+
+/* --- Mimic Page Background --- */
+
+/* Gradient Background Animation for Mimic Page - Linear Style */
+main.mimic-background {
+  position: relative;
+  /* Default: Animated Pink/Purple Gradient */
+  background: linear-gradient(
+    180deg,
+    #E0BBE4 0%,  /* Light Pink/Lavender */
+    #957DAD 30%, /* Mid Purple */
+    #D291BC 60%, /* Pinkish Purple */
+    #FEC8D8 100% /* Lighter Pink */
+  );
+  background-size: 300% 300%; /* Larger size for more movement */
+  animation: mimic-idle-gradient-animation 10s ease infinite;
+  transition: background 0.8s ease-in-out;
+}
+
+main.mimic-background.speaking {
+  /* Speaking: Animated Blue/Yellow Gradient */
+  background: linear-gradient(
+    180deg, /* Vertical flow */
+    #A7C7E7 0%,  /* Light Blue */
+    #77B5FE 30%, /* Sky Blue */
+    #FFD700 60%, /* Gold */
+    #FFFACD 100% /* Lemon Chiffon */
+  );
+  background-size: 300% 300%; /* Match idle size */
+  animation: mimic-speaking-gradient-animation 7s ease infinite;
+}
+
+/* Keyframes for the MIMIC IDLE (Pink/Purple) state */
+@keyframes mimic-idle-gradient-animation {
+  0% { background-position: 0% 0%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+/* Keyframes for the MIMIC SPEAKING (Blue/Yellow) state */
+@keyframes mimic-speaking-gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Ensure content remains visible (can reuse if needed, but mimic might have its own) */
+/* .mimic-content-container {
+  position: relative;
+  z-index: 10;
+} */
+
+/* Add text shadow for mimic page if needed */
+/* .mimic-title {
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+} */
+
+/* --- CenterScreen Page Background --- */
+
+/* Gradient Background Animation for CenterScreen Page */
+main.centerscreen-background {
+  position: relative;
+  /* Default: Animated Red/Orange Gradient */
+  background: linear-gradient(
+    180deg,
+    #FF4500 0%, /* OrangeRed */
+    #FF8C00 30%, /* DarkOrange */
+    #FFA500 60%, /* Orange */
+    #FFDAB9 100% /* PeachPuff */
+  );
+  background-size: 300% 300%;
+  animation: centerscreen-idle-gradient-animation 12s ease infinite; /* Slightly slower animation */
+  transition: background 0.9s ease-in-out;
+}
+
+main.centerscreen-background.speaking {
+  /* Speaking: Animated Blue/Green Gradient */
+  background: linear-gradient(
+    180deg,
+    #2E8B57 0%,  /* SeaGreen */
+    #3CB371 30%, /* MediumSeaGreen */
+    #48D1CC 60%, /* MediumTurquoise */
+    #AFEEEE 100% /* PaleTurquoise */
+  );
+  background-size: 300% 300%;
+  animation: centerscreen-speaking-gradient-animation 8s ease infinite; /* Slightly slower animation */
+}
+
+/* Keyframes for the CENTERSCREEN IDLE (Red/Orange) state */
+@keyframes centerscreen-idle-gradient-animation {
+  0% { background-position: 50% 0%; }
+  50% { background-position: 50% 100%; }
+  100% { background-position: 50% 0%; }
+}
+
+/* Keyframes for the CENTERSCREEN SPEAKING (Blue/Green) state */
+@keyframes centerscreen-speaking-gradient-animation {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 0%;}
+  75% { background-position: 0% 0%; }
+  100% { background-position: 0% 50%; }
+}

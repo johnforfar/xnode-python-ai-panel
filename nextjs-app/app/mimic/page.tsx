@@ -253,8 +253,12 @@ export default function SpeakerPage() {
 
   return (
     // Use a relative container for absolute positioning of overlays
-    <main className="relative min-h-screen w-full overflow-hidden text-white">
-      {/* Optional: Dark Scrim for Text Readability */}
+    <main
+      className={`relative min-h-screen w-full overflow-hidden text-white mimic-background ${
+        isPlaying ? "speaking" : ""
+      }`}
+    >
+      {/* Optional: Dark Scrim for Text Readability - Can be adjusted or removed */}
       <div className="absolute inset-0 bg-black/30 -z-10"></div>
 
       {/* Status indicator & TEMP Toggle Button */}
