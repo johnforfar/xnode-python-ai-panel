@@ -93,7 +93,6 @@ export default function CenterScreenPage() {
     socket.onerror = (event) => {
       console.error(`CenterScreen: WebSocket error:`, event);
       setWsStatus("error");
-      setCurrentText("WebSocket connection error.");
     };
 
     socket.onclose = (event) => {
@@ -108,7 +107,6 @@ export default function CenterScreenPage() {
           `WebSocket closed abnormally (code: ${event.code}), setting text to 'Panel ended'.`
         );
       }
-      setHistoryLog([]); // Clear history on close
     };
 
     // Cleanup function
