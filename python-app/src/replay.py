@@ -61,7 +61,7 @@ script = [
     { "speaker": "CryptoKitty", "line": "Thank you, humans, for watching four screens yell at each other while pretending it's financial insight."},
     { "speaker": "CryptoKitty", "line": "It's been a blast being your glitchy, overly confident host."},
     { "speaker": "CryptoKitty", "line": "Enjoy the rest of Token2049 - and remember: If an AI panel gave you better alpha than your favorite influencer... maybe upgrade your sources. Meow."},
-    # { "speaker": "System", "line": "Panel Ended."}, # Empty to show end of the conversation
+    { "speaker": "System", "line": "Panel Ended."}, # Empty to show end of the conversation
 ]
 
 
