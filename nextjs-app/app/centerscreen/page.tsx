@@ -128,11 +128,14 @@ export default function CenterScreenPage() {
   useEffect(() => {
     // Find latest message after current timestamp
     const timer = setInterval(() => {
-      const latestItem = historyLog.find(
+      const latestIndex = historyLog.findIndex(
         (m) => new Date(m.timestamp).getTime() > new Date().getTime()
       );
-      setCurrentText(latestItem?.text ?? "");
-      setCurrentSpeaker(latestItem?.agent ?? "");
+      if (latestIndex > 0) {
+        const latestItem = historyLog.at(latestIndex - 1);
+        setCurrentText(latestItem?.text ?? "");
+        setCurrentSpeaker(latestItem?.agent ?? "");
+      }
     }, 10);
 
     return () => clearInterval(timer);
