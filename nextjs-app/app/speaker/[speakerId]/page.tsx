@@ -8,11 +8,11 @@ import { AudioPlayer } from "@/lib/audioplayer";
 
 // Define speaker data mapping - UPDATED based on user request and backend names
 const speakerData: { [key: string]: { name: string; image: string } } = {
-  "1": { name: "CryptoKitty", image: "/1.jpg" },  // Moderator (previously named Kxi)
-  "2": { name: "MrLightning", image: "/2.jpg" },  // Michael Saylor (previously named Liq)
-  "3": { name: "PeterGoldBug", image: "/3.jpg" },  // Peter Schiff (previously named Kai)
-  "4": { name: "RealSatoshi", image: "/4.jpg" },  // Satoshi Nakamoto (previously named Vivi)
-  "5": { name: "TheDon", image: "/5.jpg" },  // Donald Trump (previously named Nn)
+  "1": { name: "CryptoKitty", image: "/1.jpg" }, // Moderator (previously named Kxi)
+  "2": { name: "MrLightning", image: "/2.jpg" }, // Michael Saylor (previously named Liq)
+  "3": { name: "PeterGoldBug", image: "/3.jpg" }, // Peter Schiff (previously named Kai)
+  "4": { name: "RealSatoshi", image: "/4.jpg" }, // Satoshi Nakamoto (previously named Vivi)
+  "5": { name: "TheDon", image: "/5.jpg" }, // Donald Trump (previously named Nn)
 };
 
 // --- WebSocket Connection Status Type ---
@@ -78,6 +78,12 @@ export default function SpeakerPage() {
           btoa(JSON.stringify({ type: "subscribe", payload: speaker }))
         )
       );
+      setInterval(() => {
+        // Keep alive heartbeat
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(btoa(JSON.stringify({ type: "ping" })));
+        }
+      }, 1000);
     };
 
     socket.onmessage = (event) => {
@@ -148,7 +154,7 @@ export default function SpeakerPage() {
   return (
     // Use a relative container for absolute positioning of overlays
     <main
-      className={`relative min-h-screen w-full font-sans overflow-hidden text-white speaker-background ${
+      className={`relative min-h-screen w-full overflow-hidden text-white speaker-background ${
         isPlaying ? "speaking" : ""
       }`}
     >

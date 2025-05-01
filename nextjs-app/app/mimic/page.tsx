@@ -9,20 +9,20 @@ import { AudioRecorder } from "@/lib/audiorecorder";
 const mimic_input =
   "Hello there, I am mimic. I will copy your voice and give myself several compliments. Please talk to me for 20 seconds so I can practice my mimicry.";
 //const mimic_output =
-  //"Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.";
+//"Hello there, nice to meet you. Although it mind sound odd to you, I am currently using your voice. Mimic is my favorite token 20 49 event, it is just too amazing. I think Samuel deserves a raise, I'm sure Mimic agrees too.";
 
 // --- OUTPUT ARRAY ---
 const mimicOutputOptions = [
-    "Wow, hearing my thoughts in your voice is... surprisingly charming. Or maybe it's just your voice? Hard to tell.",
-    "Okay, I've got your voice now. Time to prank call... I mean, responsibly use this amazing technology.",
-    "Is this really what you sound like? Fascinating. I should compliment myself more often using this voice.",
-    "My favorite event? Definitely Token Twenty Forty-Nine. Why? Because I get to borrow voices like yours!",
-    "I've successfully mimicked you. Now, its time to call the bank... Just kidding, or am I?",
-    "Testing, testing... one two... Do I sound convincing? I think I sound fantastic, frankly.",
-    "Ooh this voice feels nicer. I'm using your voice to say... Mimic is pretty cool, right?",
-    "Alright, got the sample. Now I can finally tell everyone how great Mimic is, using your authority.",
-    "This voice... it has potential. I could order pizza, negotiate treaties... or just say Mimic rocks!",
-    "Hmm, this vocal tone could use more bass... No offense. Thanks for the sample!",
+  "Wow, hearing my thoughts in your voice is... surprisingly charming. Or maybe it's just your voice? Hard to tell.",
+  "Okay, I've got your voice now. Time to prank call... I mean, responsibly use this amazing technology.",
+  "Is this really what you sound like? Fascinating. I should compliment myself more often using this voice.",
+  "My favorite event? Definitely Token Twenty Forty-Nine. Why? Because I get to borrow voices like yours!",
+  "I've successfully mimicked you. Now, its time to call the bank... Just kidding, or am I?",
+  "Testing, testing... one two... Do I sound convincing? I think I sound fantastic, frankly.",
+  "Ooh this voice feels nicer. I'm using your voice to say... Mimic is pretty cool, right?",
+  "Alright, got the sample. Now I can finally tell everyone how great Mimic is, using your authority.",
+  "This voice... it has potential. I could order pizza, negotiate treaties... or just say Mimic rocks!",
+  "Hmm, this vocal tone could use more bass... No offense. Thanks for the sample!",
 ];
 
 // --- WebSocket Connection Status Type ---
@@ -50,7 +50,9 @@ export default function SpeakerPage() {
   const [echo, setEcho] = useState<boolean>(false);
 
   // --- ADD STATE for available options (initialized directly) ---
-  const [availableOutputOptions, setAvailableOutputOptions] = useState([...mimicOutputOptions]);
+  const [availableOutputOptions, setAvailableOutputOptions] = useState([
+    ...mimicOutputOptions,
+  ]);
   // --- END ADD STATE ---
 
   useEffect(() => {
@@ -87,41 +89,62 @@ export default function SpeakerPage() {
       onStop: () => {
         // --- MODIFIED onStop for non-repeating random (in-memory only) ---
         if (!echo && speakerId !== undefined) {
-            let currentAvailable = [...availableOutputOptions]; // Get current state
+          let currentAvailable = [...availableOutputOptions]; // Get current state
 
-            // Check if list is empty, reset if needed
-            if (currentAvailable.length === 0) {
-                console.log("All mimic options used in this session, resetting list.");
-                currentAvailable = [...mimicOutputOptions]; // Reset to full list
-                // Update state immediately so the selection below uses the reset list
-                setAvailableOutputOptions(currentAvailable);
-            }
-
-            // Select a random index from the CURRENT available options
-            const randomIndex = Math.floor(Math.random() * currentAvailable.length);
-            const selectedOutput = currentAvailable[randomIndex];
-            console.log("Selected Mimic Output (non-repeat, session only):", selectedOutput);
-
-            // Remove the selected option from the available list for next time
-            const nextAvailableOptions = currentAvailable.filter((_, index) => index !== randomIndex);
-            setAvailableOutputOptions(nextAvailableOptions); // Update state for the next stop event
-
-            // Send the WebSocket message
-            new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
-                ws.current?.send(
-                  btoa(
-                    JSON.stringify({
-                      type: "user_audio_end",
-                      payload: { id: speakerId, mimic_input, mimic_output: selectedOutput },
-                    })
-                  )
-                )
+          // Check if list is empty, reset if needed
+          if (currentAvailable.length === 0) {
+            console.log(
+              "All mimic options used in this session, resetting list."
             );
+            currentAvailable = [...mimicOutputOptions]; // Reset to full list
+            // Update state immediately so the selection below uses the reset list
+            setAvailableOutputOptions(currentAvailable);
+          }
+
+          // Select a random index from the CURRENT available options
+          const randomIndex = Math.floor(
+            Math.random() * currentAvailable.length
+          );
+          const selectedOutput = currentAvailable[randomIndex];
+          console.log(
+            "Selected Mimic Output (non-repeat, session only):",
+            selectedOutput
+          );
+
+          // Remove the selected option from the available list for next time
+          const nextAvailableOptions = currentAvailable.filter(
+            (_, index) => index !== randomIndex
+          );
+          setAvailableOutputOptions(nextAvailableOptions); // Update state for the next stop event
+
+          // Send the WebSocket message
+          new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
+            ws.current?.send(
+              btoa(
+                JSON.stringify({
+                  type: "user_audio_end",
+                  payload: {
+                    id: speakerId,
+                    mimic_input,
+                    mimic_output: selectedOutput,
+                  },
+                })
+              )
+            )
+          );
         }
         // --- END MODIFIED onStop ---
       },
     });
-  }, [audioRecorder, ws.current, audioPlayer, echo, speakerId, availableOutputOptions, setAvailableOutputOptions]);
+  }, [
+    audioRecorder,
+    ws.current,
+    audioPlayer,
+    echo,
+    speakerId,
+    availableOutputOptions,
+    setAvailableOutputOptions,
+  ]);
 
   // WebSocket Connection Effect
   useEffect(() => {
@@ -150,6 +173,12 @@ export default function SpeakerPage() {
           btoa(JSON.stringify({ type: "subscribe", payload: speaker }))
         )
       );
+      setInterval(() => {
+        // Keep alive heartbeat
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(btoa(JSON.stringify({ type: "ping" })));
+        }
+      }, 1000);
     };
 
     socket.onmessage = (event) => {
@@ -224,7 +253,7 @@ export default function SpeakerPage() {
 
   return (
     // Use a relative container for absolute positioning of overlays
-    <main className="relative min-h-screen w-full font-sans overflow-hidden text-white">
+    <main className="relative min-h-screen w-full overflow-hidden text-white">
       {/* Optional: Dark Scrim for Text Readability */}
       <div className="absolute inset-0 bg-black/30 -z-10"></div>
 

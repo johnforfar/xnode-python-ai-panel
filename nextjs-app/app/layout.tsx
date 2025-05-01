@@ -32,9 +32,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head />
-      <body className={cn("min-h-screen bg-background font-sans antialiased bg-gradient-to-b from-[#1B2538] to-[#0F172A]", inter.className)}>
-          {children}
-          <Toaster />
+      <body
+        className={cn(
+          "min-h-screen bg-background antialiased bg-gradient-to-b from-[#1B2538] to-[#0F172A]",
+          inter.className
+        )}
+      >
+        {children}
+        <Toaster />
       </body>
     </html>
   );

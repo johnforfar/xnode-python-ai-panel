@@ -40,11 +40,36 @@ const speakerPanelData: {
     image: string;
   };
 } = {
-  "1": { id: "1", name: "CryptoKitty", inspiration: "Moderator", image: "/1.jpg" }, // Moderator (previously named Kxi)
-  "2": { id: "2", name: "MrLightning", inspiration: "Michael Saylor", image: "/2.jpg" }, // Michael Saylor (previously named Liq)
-  "3": { id: "3", name: "PeterGoldBug", inspiration: "Peter Schiff", image: "/3.jpg" }, // Peter Schiff (previously named Kai)
-  "4": { id: "4", name: "RealSatoshi", inspiration: "Satoshi Nakamoto", image: "/4.jpg" }, // Satoshi Nakamoto (previously named Vivi)
-  "5": { id: "5", name: "TheDon", inspiration: "Donald Trump", image: "/5.jpg" }, // Donald Trump (previously named Nn)
+  "1": {
+    id: "1",
+    name: "CryptoKitty",
+    inspiration: "Moderator",
+    image: "/1.jpg",
+  }, // Moderator (previously named Kxi)
+  "2": {
+    id: "2",
+    name: "MrLightning",
+    inspiration: "Michael Saylor",
+    image: "/2.jpg",
+  }, // Michael Saylor (previously named Liq)
+  "3": {
+    id: "3",
+    name: "PeterGoldBug",
+    inspiration: "Peter Schiff",
+    image: "/3.jpg",
+  }, // Peter Schiff (previously named Kai)
+  "4": {
+    id: "4",
+    name: "RealSatoshi",
+    inspiration: "Satoshi Nakamoto",
+    image: "/4.jpg",
+  }, // Satoshi Nakamoto (previously named Vivi)
+  "5": {
+    id: "5",
+    name: "TheDon",
+    inspiration: "Donald Trump",
+    image: "/5.jpg",
+  }, // Donald Trump (previously named Nn)
 };
 
 export default function Home() {
@@ -221,6 +246,12 @@ export default function Home() {
             btoa(JSON.stringify({ type: "subscribe", payload: speaker }))
           )
         );
+        setInterval(() => {
+          // Keep alive heartbeat
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(btoa(JSON.stringify({ type: "ping" })));
+          }
+        }, 1000);
       } else {
         console.warn(
           "WebSocket opened, but ws.current points to a different instance. Closing this orphaned socket."

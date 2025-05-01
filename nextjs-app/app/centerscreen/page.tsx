@@ -6,11 +6,11 @@ import Image from "next/image";
 
 // Define speaker data mapping - MUST MATCH BACKEND (e.g., python-app/src/replay.py speaker_id map)
 const speakerIdToName: { [key: number]: string } = {
-  0: "CryptoKitty",  // Moderator
-  1: "MrLightning",  // Inspired by Michael Saylor
-  2: "PeterGoldBug",  // Inspired by Peter Schiff
+  0: "CryptoKitty", // Moderator
+  1: "MrLightning", // Inspired by Michael Saylor
+  2: "PeterGoldBug", // Inspired by Peter Schiff
   3: "RealSatoshi", // Inspired by Satoshi Nakamoto
-  4: "TheDon"    // Inspired by Donald Trump
+  4: "TheDon", // Inspired by Donald Trump
 };
 
 // Define message types expected from WebSocket
@@ -40,7 +40,9 @@ export default function CenterScreenPage() {
   const [currentText, setCurrentText] = useState<string>(
     "Waiting for conversation..."
   );
-  const [currentSpeakerName, setCurrentSpeakerName] = useState<string | null>(null); // Track speaker
+  const [currentSpeakerName, setCurrentSpeakerName] = useState<string | null>(
+    null
+  ); // Track speaker
   const [historyLog, setHistoryLog] = useState<HistoryMessage[]>([]); // Store history
   const [wsStatus, setWsStatus] = useState<WsConnectionStatus>("closed");
   const ws = useRef<WebSocket | null>(null);
@@ -61,13 +63,21 @@ export default function CenterScreenPage() {
     socket.onopen = () => {
       console.log(`CenterScreen: WebSocket connection established`);
       setWsStatus("open");
-       // Subscribe to all speakers - necessary if backend filters non-subscribed audio
-       // Even though we don't play audio here, receiving the 'audio' message
-       // for the speaker is our trigger to display their text.
-      Object.keys(speakerIdToName).forEach(id => {
-          socket.send(btoa(JSON.stringify({ type: "subscribe", payload: parseInt(id) })));
-          console.log(`CenterScreen: Subscribed to speaker ${id}`);
+      // Subscribe to all speakers - necessary if backend filters non-subscribed audio
+      // Even though we don't play audio here, receiving the 'audio' message
+      // for the speaker is our trigger to display their text.
+      Object.keys(speakerIdToName).forEach((id) => {
+        socket.send(
+          btoa(JSON.stringify({ type: "subscribe", payload: parseInt(id) }))
+        );
+        console.log(`CenterScreen: Subscribed to speaker ${id}`);
       });
+      setInterval(() => {
+        // Keep alive heartbeat
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(btoa(JSON.stringify({ type: "ping" })));
+        }
+      }, 1000);
     };
 
     socket.onmessage = (event) => {
@@ -84,54 +94,59 @@ export default function CenterScreenPage() {
 
           // Update text based on latest history entry initially, only if no speaker is active
           if (!currentSpeakerName) {
-              const latestMessage = newHistory
+            const latestMessage = newHistory
+              .slice()
+              .reverse()
+              .find((msg) => msg.agent !== "System");
+
+            if (latestMessage && latestMessage.text) {
+              if (latestMessage.text !== currentText) {
+                setCurrentText(latestMessage.text);
+                // Don't set currentSpeakerName from history directly, wait for audio trigger
+              }
+            } else if (newHistory.length <= 1) {
+              setCurrentText("Waiting for conversation...");
+              setCurrentSpeakerName(null);
+            }
+          }
+        } else if (message.type === "audio") {
+          // Update text based on the speaker whose audio chunk arrived
+          const speakerId: number | undefined = message.payload?.speaker;
+
+          if (speakerId !== undefined && historyLog.length > 0) {
+            const speakerName = speakerIdToName[speakerId];
+            if (speakerName) {
+              // Find the latest message from this specific speaker in our stored history
+              const speakerLastMessage = historyLog
                 .slice()
                 .reverse()
-                .find((msg) => msg.agent !== "System");
+                .find((msg) => msg.agent === speakerName);
 
-              if (latestMessage && latestMessage.text) {
-                 if (latestMessage.text !== currentText) {
-                     setCurrentText(latestMessage.text);
-                     // Don't set currentSpeakerName from history directly, wait for audio trigger
-                 }
-              } else if (newHistory.length <= 1) {
-                setCurrentText("Waiting for conversation...");
-                setCurrentSpeakerName(null);
-              }
-          }
-
-        } else if (message.type === "audio") {
-            // Update text based on the speaker whose audio chunk arrived
-            const speakerId: number | undefined = message.payload?.speaker;
-
-            if (speakerId !== undefined && historyLog.length > 0) {
-                const speakerName = speakerIdToName[speakerId];
-                if (speakerName) {
-                    // Find the latest message from this specific speaker in our stored history
-                    const speakerLastMessage = historyLog
-                        .slice()
-                        .reverse()
-                        .find(msg => msg.agent === speakerName);
-
-                    if (speakerLastMessage && speakerLastMessage.text) {
-                         // Update text only if it's different or speaker changes
-                         if (speakerLastMessage.text !== currentText || speakerName !== currentSpeakerName) {
-                            setCurrentText(speakerLastMessage.text);
-                            setCurrentSpeakerName(speakerName); // Track current speaker
-                            console.log(`CenterScreen: Displaying text for speaker: ${speakerName}`);
-                         }
-                    }
-                } else {
-                     console.warn(`CenterScreen: Received audio chunk for unknown speaker ID: ${speakerId}`);
+              if (speakerLastMessage && speakerLastMessage.text) {
+                // Update text only if it's different or speaker changes
+                if (
+                  speakerLastMessage.text !== currentText ||
+                  speakerName !== currentSpeakerName
+                ) {
+                  setCurrentText(speakerLastMessage.text);
+                  setCurrentSpeakerName(speakerName); // Track current speaker
+                  console.log(
+                    `CenterScreen: Displaying text for speaker: ${speakerName}`
+                  );
                 }
+              }
+            } else {
+              console.warn(
+                `CenterScreen: Received audio chunk for unknown speaker ID: ${speakerId}`
+              );
             }
-
+          }
         } else if (message.type === "status_update") {
-           // Optional: Handle panel stop status
-           if(message.payload?.active === false && wsStatus !== 'closed') {
-                setCurrentText("Panel ended.");
-                setCurrentSpeakerName(null);
-           }
+          // Optional: Handle panel stop status
+          if (message.payload?.active === false && wsStatus !== "closed") {
+            setCurrentText("Panel ended.");
+            setCurrentSpeakerName(null);
+          }
         }
       } catch (e) {
         console.error(
@@ -155,14 +170,17 @@ export default function CenterScreenPage() {
       );
       setWsStatus("closed");
       ws.current = null;
-       if (event.code !== 1000) { // Don't show specific disconnect message on abnormal close
-           console.warn(`WebSocket closed abnormally (code: ${event.code}), setting text to 'Panel ended'.`);
-           setCurrentText("Panel ended."); // Set to "Panel ended." on abnormal close too
-       } else {
-            setCurrentText("Panel ended."); // Assume clean close means panel ended
-       }
-       setCurrentSpeakerName(null);
-       setHistoryLog([]); // Clear history on close
+      if (event.code !== 1000) {
+        // Don't show specific disconnect message on abnormal close
+        console.warn(
+          `WebSocket closed abnormally (code: ${event.code}), setting text to 'Panel ended'.`
+        );
+        setCurrentText("Panel ended."); // Set to "Panel ended." on abnormal close too
+      } else {
+        setCurrentText("Panel ended."); // Assume clean close means panel ended
+      }
+      setCurrentSpeakerName(null);
+      setHistoryLog([]); // Clear history on close
     };
 
     // Cleanup function
@@ -179,7 +197,7 @@ export default function CenterScreenPage() {
   return (
     // Using a key on main to potentially force re-render on critical state changes if needed,
     // but key on <p> tag is usually sufficient for text animation.
-    <main className="relative min-h-screen w-full font-sans overflow-hidden text-white">
+    <main className="relative min-h-screen w-full overflow-hidden text-white">
       {/* Background Image */}
       <Image
         src="/1.jpg" // Assuming 1.jpg is in the public folder
@@ -196,23 +214,22 @@ export default function CenterScreenPage() {
 
       {/* Status Indicator (Optional but helpful for debugging) */}
       <div className="absolute top-3 right-3 text-xs p-1.5 rounded bg-black/50 backdrop-blur-sm z-20 flex flex-col items-end gap-1">
-         <span>WS: {wsStatus}</span>
-         {currentSpeakerName && <span>Speaker: {currentSpeakerName}</span>}
+        <span>WS: {wsStatus}</span>
+        {currentSpeakerName && <span>Speaker: {currentSpeakerName}</span>}
       </div>
 
       {/* Content Container - Centering the text */}
       <div className="relative z-10 flex flex-col items-center justify-center h-screen p-6 text-center">
-
         {/* Speaker Name Display (conditional) */}
         {currentSpeakerName && (
-           <h2
-             // Use a key to potentially help with transitions if needed later
-             key={`${currentSpeakerName}-name`}
-             className="text-xl md:text-2xl lg:text-3xl font-medium mb-4 text-gray-300 animate-fade-in" // Smaller size, lighter color, margin bottom
-             style={{ textShadow: "1px 1px 4px rgba(0,0,0,0.6)" }}
-           >
-              {currentSpeakerName} says:
-           </h2>
+          <h2
+            // Use a key to potentially help with transitions if needed later
+            key={`${currentSpeakerName}-name`}
+            className="text-xl md:text-2xl lg:text-3xl font-medium mb-4 text-gray-300 animate-fade-in" // Smaller size, lighter color, margin bottom
+            style={{ textShadow: "1px 1px 4px rgba(0,0,0,0.6)" }}
+          >
+            {currentSpeakerName} says:
+          </h2>
         )}
 
         {/* Main Text Display (Smaller) */}
@@ -229,15 +246,21 @@ export default function CenterScreenPage() {
       {/* Basic Fade-in Animation Definition (add to your global CSS if preferred) */}
       <style jsx global>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
         .animate-fade-in {
           animation: fadeIn 0.5s ease-out forwards;
         }
         /* Ensure specificity if Tailwind overrides */
         main > div > p.animate-fade-in {
-           animation: fadeIn 0.5s ease-out forwards !important;
+          animation: fadeIn 0.5s ease-out forwards !important;
         }
       `}</style>
     </main>
