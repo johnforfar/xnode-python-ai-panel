@@ -18,7 +18,7 @@ script = [
     { "speaker": "CryptoKitty", "line": "Alright - tonight, four screens, four personalities, one explosive topic."},
     { "speaker": "CryptoKitty", "line": "Where is Bitcoin headed in this bull market? Buckle up, folks, it's about to get weird."},
     { "speaker": "CryptoKitty", "line": "First up, a man who speaks in all caps even when he's silent!"},
-    { "speaker": "CryptoKitty", "line": "The original poster boy of American exceptionalism, and now, apparently, the self - declared CEO of Bitcoin. Ladies and gentlemen... Mr. Donald J. Trump!"},
+    { "speaker": "CryptoKitty", "line": "The original poster boy of American exceptionalism, and now, apparently, the self-declared CEO of Bitcoin. Ladies and gentlemen... Mr. Donald J. Trump!"},
     { "speaker": "CryptoKitty", "line": "Next, the eternal hater of all things crypto - but somehow, he keeps getting invited. He's been yelling \"Buy Gold!\" since Y2K, and probably thinks a cold wallet is just a broken purse."},
     { "speaker": "CryptoKitty", "line": "Please welcome Peter \"Still Not Into Bitcoin\" Schiff!"},
     { "speaker": "CryptoKitty", "line": "Now entering the panel... or is he? The creator of Bitcoin. The ghost in the blockchain. The reason your uncle won't shut up about crypto at Thanksgiving."},
