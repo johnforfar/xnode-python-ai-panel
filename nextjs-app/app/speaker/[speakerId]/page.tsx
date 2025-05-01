@@ -8,12 +8,11 @@ import { AudioPlayer } from "@/lib/audioplayer";
 
 // Define speaker data mapping - UPDATED based on user request and backend names
 const speakerData: { [key: string]: { name: string; image: string } } = {
-  "1": { name: "Kxi", image: "/1.jpg" }, // Moderator (originally speaker_id 0)
-  "2": { name: "Liq", image: "/2.jpg" }, // Originally speaker_id 1
-  "3": { name: "Kai", image: "/3.jpg" }, // Originally speaker_id 2
-  "4": { name: "Vivi", image: "/4.jpg" }, // Originally speaker_id 3
-  "5": { name: "Nn", image: "/5.jpg" }, // Originally speaker_id 4
-  // Add more speakers if needed, ensure image paths match
+  "1": { name: "CryptoKitty", image: "/1.jpg" },  // Moderator (previously named Kxi)
+  "2": { name: "MrLightning", image: "/2.jpg" },  // Michael Saylor (previously named Liq)
+  "3": { name: "PeterGoldBug", image: "/3.jpg" },  // Peter Schiff (previously named Kai)
+  "4": { name: "RealSatoshi", image: "/4.jpg" },  // Satoshi Nakamoto (previously named Vivi)
+  "5": { name: "TheDon", image: "/5.jpg" },  // Donald Trump (previously named Nn)
 };
 
 // --- WebSocket Connection Status Type ---
@@ -185,7 +184,7 @@ export default function SpeakerPage() {
           {" "}
           {/* Pushes name down slightly */}
           <h1
-            className="text-7xl md:text-9xl font-bold whitespace-normal break-words text-center speaker-name"
+            className="text-6xl md:text-7xl font-bold whitespace-normal break-words text-center speaker-name"
             style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.7)" }} // Add shadow for readability
           >
             {speakerInfo.name}

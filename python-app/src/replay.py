@@ -26,8 +26,8 @@ script = [
 
 speaker_id = {
     "CryptoKitty": 0,    # Moderator (previously named Kxi)
-    "PeterGoldBug": 1,   # Peter Schiff (previously named Kai)
-    "MrLightning": 2,    # Michael Saylor (previously named Liq)
+    "MrLightning": 1,    # Michael Saylor (previously named Liq)
+    "PeterGoldBug": 2,   # Peter Schiff (previously named Kai)
     "RealSatoshi": 3,    # Satoshi Nakamoto (previously named Vivi)
     "TheDon": 4          # Donald Trump (previously named Nn)
 }

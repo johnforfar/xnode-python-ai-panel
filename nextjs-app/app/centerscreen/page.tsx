@@ -6,11 +6,11 @@ import Image from "next/image";
 
 // Define speaker data mapping - MUST MATCH BACKEND (e.g., python-app/src/replay.py speaker_id map)
 const speakerIdToName: { [key: number]: string } = {
-  0: "Kxi",  // Moderator
-  1: "Liq",  // Inspired by Michael Saylor
-  2: "Kai",  // Inspired by Peter Schiff
-  3: "Vivi", // Inspired by Satoshi Nakamoto
-  4: "Nn"    // Inspired by Donald Trump
+  0: "CryptoKitty",  // Moderator
+  1: "MrLightning",  // Inspired by Michael Saylor
+  2: "PeterGoldBug",  // Inspired by Peter Schiff
+  3: "RealSatoshi", // Inspired by Satoshi Nakamoto
+  4: "TheDon"    // Inspired by Donald Trump
 };
 
 // Define message types expected from WebSocket

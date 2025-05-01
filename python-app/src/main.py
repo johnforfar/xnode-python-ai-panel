@@ -113,11 +113,11 @@ Example Output: "First up: Is Bitcoin better than gold? Liq, go ahead."
 # --- Define Agents List with Speaker IDs ---
 # Speaker IDs: Liq=1, Kai=2, Vivi=3, Nn=4, Kxi=0 (Keeping original numerical IDs)
 AGENTS_CONFIG = [
-    {"name": "Kxi",  "prompt": KXI_PROMPT,  "speaker_id": 0, "port": 8000, "is_moderator": True}, # Moderator on main port
-    {"name": "Liq",  "prompt": LIQ_PROMPT,  "speaker_id": 1, "port": 8001, "is_moderator": False}, # Inspired by Michael Saylor
-    {"name": "Kai",  "prompt": KAI_PROMPT,  "speaker_id": 2, "port": 8002, "is_moderator": False}, # Inspired by Peter Schiff
-    {"name": "Vivi", "prompt": VIVI_PROMPT, "speaker_id": 3, "port": 8003, "is_moderator": False}, # Inspired by Satoshi Nakamoto
-    {"name": "Nn",   "prompt": NN_PROMPT,   "speaker_id": 4, "port": 8004, "is_moderator": False}, # Inspired by Donald Trump
+    {"name": "CryptoKitty",  "prompt": KXI_PROMPT,  "speaker_id": 0, "port": 8000, "is_moderator": True}, # Moderator on main port
+    {"name": "MrLightning",  "prompt": LIQ_PROMPT,  "speaker_id": 1, "port": 8001, "is_moderator": False}, # Inspired by Michael Saylor
+    {"name": "PeterGoldBug",  "prompt": KAI_PROMPT,  "speaker_id": 2, "port": 8002, "is_moderator": False}, # Inspired by Peter Schiff
+    {"name": "RealSatoshi", "prompt": VIVI_PROMPT, "speaker_id": 3, "port": 8003, "is_moderator": False}, # Inspired by Satoshi Nakamoto
+    {"name": "TheDon",   "prompt": NN_PROMPT,   "speaker_id": 4, "port": 8004, "is_moderator": False}, # Inspired by Donald Trump
 ]
 
 # Create Agent Instances using uagents
@@ -131,11 +131,11 @@ for config in AGENTS_CONFIG:
     )
     agents_dict[config["name"]] = agent
 
-kxi_agent = agents_dict["Kxi"]
-liq_agent = agents_dict["Liq"]
-kai_agent = agents_dict["Kai"]
-vivi_agent = agents_dict["Vivi"]
-nn_agent = agents_dict["Nn"]
+kxi_agent = agents_dict["CryptoKitty"]
+liq_agent = agents_dict["MrLightning"]
+kai_agent = agents_dict["PeterGoldBug"]
+vivi_agent = agents_dict["RealSatoshi"]
+nn_agent = agents_dict["TheDon"]
 
 # Define order for round-robin
 DEBATER_AGENTS = [liq_agent, kai_agent, vivi_agent, nn_agent]
