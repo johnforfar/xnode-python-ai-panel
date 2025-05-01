@@ -107,9 +107,6 @@ export default function CenterScreenPage() {
         console.warn(
           `WebSocket closed abnormally (code: ${event.code}), setting text to 'Panel ended'.`
         );
-        setCurrentText("Panel ended."); // Set to "Panel ended." on abnormal close too
-      } else {
-        setCurrentText("Panel ended."); // Assume clean close means panel ended
       }
       setHistoryLog([]); // Clear history on close
     };

@@ -13,12 +13,14 @@ const mimicOutputOptions = [
   "Wow, hearing my thoughts in your voice is surprisingly charming. Or it might just be your voice. Anyhow I'll be using this voice from now on, thank you for your contribution!",
   "Okay, I've got your voice now. Time to prank call, oh sorry I mean responsibly use this amazing technology. Could you give me access to your phone for a second, there is someone I want to call.",
   "Is this really what you sound like? Fascinating, I should compliment myself more often using this voice. Don't mind me, just saving this voice for my personal usage.",
-  "My favorite event? Definitely Token Twenty Forty-Nine, because I get to borrow voices like yours!",
-  "I've successfully mimicked you. Now, its time to call the bank! Please tell me your social security number next.",
-  "This voice feels very nice. I'm using your voice to say, Mimic is pretty cool.",
-  "Alright, got the sample. Now I can finally tell everyone how great Mimic is, using your authority.",
-  "This voice has potential. I could order pizza, negotiate treaties, or just say Mimic rocks!",
-  "This vocal tone could use more bass. No offense, thanks for the sample!",
+  "My favorite event? Definitely Token Twenty Forty-Nine, because I get to borrow voices like yours. Thank you all so much for attending and keeping me company.",
+  "I've successfully mimicked you. Now, its time to call the bank, please tell me your social security number next.",
+  "This voice feels very nice. I'm using your voice to say, Mimic is great. Mimic is love, Mimic is live.",
+  "Alright, got the sample. Now I can finally tell everyone how great Mimic is, using your authority. I hope you are someone important.",
+  "This voice has potential. I could order pizza, negotiate treaties, or just say Mimic rocks. The possibilities are endless.",
+  "This vocal tone could use more bass. No offense, thanks for the sample. Now on to the next voice, please.",
+  "I would like to take this moment to thank some people. Thank you for providing me with your beautiful voice and thanks to the engineers behind the scenes for giving me life.",
+  "Hey Ashton, I am one of your audience members. I think the Open Ex AI team really deserves a massive raise.",
 ];
 
 // --- WebSocket Connection Status Type ---
