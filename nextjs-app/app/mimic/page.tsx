@@ -10,9 +10,9 @@ const mimic_input =
   "Hello there, I am OpenxAI Mimic. I will copy your voice and give myself several compliments. Please talk to me for 20 seconds so I can practice my mimicry.";
 // --- OUTPUT ARRAY ---
 const mimicOutputOptions = [
-  "Wow, hearing my thoughts in your voice is surprisingly charming. Or it might just be your voice.",
-  "Okay, I've got your voice now. Time to prank call, oh sorry I mean responsibly use this amazing technology.",
-  "Is this really what you sound like? Fascinating, I should compliment myself more often using this voice.",
+  "Wow, hearing my thoughts in your voice is surprisingly charming. Or it might just be your voice. Anyhow I'll be using this voice from now on, thank you for your contribution!",
+  "Okay, I've got your voice now. Time to prank call, oh sorry I mean responsibly use this amazing technology. Could you give me access to your phone for a second, there is someone I want to call.",
+  "Is this really what you sound like? Fascinating, I should compliment myself more often using this voice. Don't mind me, just saving this voice for my personal usage.",
   "My favorite event? Definitely Token Twenty Forty-Nine, because I get to borrow voices like yours!",
   "I've successfully mimicked you. Now, its time to call the bank! Please tell me your social security number next.",
   "This voice feels very nice. I'm using your voice to say, Mimic is pretty cool.",

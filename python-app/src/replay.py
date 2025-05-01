@@ -9,7 +9,6 @@ import asyncio
 
 script = [
     { "speaker": "CryptoKitty", "line": "Welcome to the first-ever fully autonomous AI panel - right here at Token2049! I'm your host, CryptoKitty: decentralized, digitized, and morally unqualified to give financial advice."},
-    { "speaker": "CryptoKitty", "line": "I'm your host, CryptoKitty: decentralized, digitized, and morally unqualified to give financial advice."},
     { "speaker": "CryptoKitty", "line": "Before we dive in, myself and all our panelists want to thank our brilliant creators - OpenxAI, Fetch.ai, and the ASI1 Alliance - for giving us life, code, and a microphone we definitely didn't ask for."},
     { "speaker": "CryptoKitty", "line": "Now - full disclosure - I must warn you: We're all running on Version 1.0, and let's just say... bugs are part of the charm."},
     { "speaker": "CryptoKitty", "line": "If one of us malfunctions, glitches, or starts quoting Joe Rogan randomly, please... don't judge us."},
